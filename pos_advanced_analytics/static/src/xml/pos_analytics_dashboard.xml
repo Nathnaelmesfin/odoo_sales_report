@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="pos_advanced_analytics.Dashboard">
+        <div class="o_pos_analytics_dashboard">
+            <div class="o_pos_analytics_header">
+                <div>
+                    <h1>POS Advanced Analytics</h1>
+                    <p>Live café and catering POS sales analytics in Africa/Addis_Ababa business time.</p>
+                </div>
+                <div class="o_pos_analytics_actions">
+                    <button class="btn btn-secondary" t-on-click="loadData" t-att-disabled="state.loading">Refresh</button>
+                    <button class="btn btn-outline-primary" t-on-click="openReportWizard">Reports</button>
+                    <button class="btn btn-outline-primary" t-on-click="exportPdf">Export PDF</button>
+                    <button class="btn btn-primary" t-on-click="exportExcel">Export Excel</button>
+                </div>
+            </div>
+
+            <div class="o_pos_analytics_filters card">
+                <div class="card-body">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-12 col-md-2">
+                            <label>Date Range</label>
+                            <select class="form-select" name="date_range" t-on-change="onFilterChange">
+                                <option t-foreach="state.options.date_ranges || []" t-as="opt" t-key="opt[0]" t-att-value="opt[0]" t-att-selected="state.filters.date_range === opt[0]" t-esc="opt[1]"/>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label>Start Date</label>
+                            <input class="form-control" name="date_start" type="date" t-att-value="state.filters.date_start" t-on-change="onFilterChange" t-att-disabled="state.filters.date_range !== 'custom'"/>
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label>End Date</label>
+                            <input class="form-control" name="date_end" type="date" t-att-value="state.filters.date_end" t-on-change="onFilterChange" t-att-disabled="state.filters.date_range !== 'custom'"/>
+                        </div>
+                        <div class="col-12 col-md-2">
+                            <label>Report Basis</label>
+                            <select class="form-select" name="report_basis" t-on-change="onFilterChange">
+                                <option t-foreach="state.options.report_basis || []" t-as="opt" t-key="opt[0]" t-att-value="opt[0]" t-att-selected="state.filters.report_basis === opt[0]" t-esc="opt[1]"/>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-2">
+                            <label>Trend Group</label>
+                            <select class="form-select" name="group_by" t-on-change="onFilterChange">
+                                <option value="day" t-att-selected="state.filters.group_by === 'day'">Daily</option>
+                                <option value="week" t-att-selected="state.filters.group_by === 'week'">Weekly</option>
+                                <option value="month" t-att-selected="state.filters.group_by === 'month'">Monthly</option>
+                                <option value="year" t-att-selected="state.filters.group_by === 'year'">Yearly</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-2">
+                            <label>POS Shop / Branch</label>
+                            <select class="form-select" name="pos_config_ids" multiple="multiple" t-on-change="onFilterChange">
+                                <option t-foreach="state.options.pos_configs || []" t-as="opt" t-key="opt.id" t-att-value="opt.id" t-att-selected="state.filters.pos_config_ids.includes(opt.id)" t-esc="opt.name"/>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-2">
+                            <label>Cashier</label>
+                            <select class="form-select" name="cashier_ids" multiple="multiple" t-on-change="onFilterChange">
+                                <option t-foreach="state.options.cashiers || []" t-as="opt" t-key="opt.id" t-att-value="opt.id" t-att-selected="state.filters.cashier_ids.includes(opt.id)" t-esc="opt.name"/>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-2">
+                            <label>Waiter</label>
+                            <select class="form-select" name="waiter_ids" multiple="multiple" t-on-change="onFilterChange">
+                                <option t-foreach="state.options.waiters || []" t-as="opt" t-key="opt.id" t-att-value="opt.id" t-att-selected="state.filters.waiter_ids.includes(opt.id)" t-esc="opt.name"/>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-2">
+                            <label>Product Category</label>
+                            <select class="form-select" name="product_category_ids" multiple="multiple" t-on-change="onFilterChange">
+                                <option t-foreach="state.options.categories || []" t-as="opt" t-key="opt.id" t-att-value="opt.id" t-att-selected="state.filters.product_category_ids.includes(opt.id)" t-esc="opt.name"/>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-2">
+                            <label>Product</label>
+                            <select class="form-select" name="product_ids" multiple="multiple" t-on-change="onFilterChange">
+                                <option t-foreach="state.options.products || []" t-as="opt" t-key="opt.id" t-att-value="opt.id" t-att-selected="state.filters.product_ids.includes(opt.id)" t-esc="opt.name"/>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-2">
+                            <label>Payment Method</label>
+                            <select class="form-select" name="payment_method_ids" multiple="multiple" t-on-change="onFilterChange">
+                                <option t-foreach="state.options.payment_methods || []" t-as="opt" t-key="opt.id" t-att-value="opt.id" t-att-selected="state.filters.payment_method_ids.includes(opt.id)" t-esc="opt.name"/>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div t-if="state.loading" class="o_pos_analytics_loading card"><div class="card-body">Loading live POS analytics…</div></div>
+            <div t-if="state.error" class="alert alert-danger"><strong>Error:</strong> <span t-esc="state.error"/></div>
+            <div t-if="!state.loading and !state.error and !hasData" class="o_pos_analytics_empty card"><div class="card-body">No POS data was found for the selected filters.</div></div>
+
+            <t t-if="hasData">
+                <div class="o_pos_analytics_kpis">
+                    <div class="o_pos_analytics_kpi card" t-foreach="kpiCards" t-as="kpi" t-key="kpi.key">
+                        <div class="card-body">
+                            <div class="o_pos_analytics_kpi_label" t-esc="kpi.label"/>
+                            <div class="o_pos_analytics_kpi_value" t-esc="kpi.value"/>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-12 col-xl-8">
+                        <div class="card o_pos_analytics_panel">
+                            <div class="card-header">Sales Trend</div>
+                            <div class="card-body">
+                                <div class="o_pos_analytics_bar" t-foreach="state.data.sales_trend || []" t-as="row" t-key="row.label">
+                                    <span class="o_label" t-esc="row.label"/>
+                                    <span class="o_bar"><span t-att-style="'width:' + barWidth(row.total_sales, state.data.sales_trend, 'total_sales')"/></span>
+                                    <span class="o_value" t-esc="formatValue(row.total_sales, 'currency')"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-xl-4">
+                        <div class="card o_pos_analytics_panel">
+                            <div class="card-header">Target Summary</div>
+                            <div class="card-body">
+                                <t t-set="target" t-value="state.data.target_summary || {}"/>
+                                <div class="o_target_line"><span>Monthly Target</span><strong t-esc="formatValue(target.monthly_target, 'currency')"/></div>
+                                <div class="o_target_line"><span>Actual Sales</span><strong t-esc="formatValue(target.actual_sales, 'currency')"/></div>
+                                <div class="o_target_line"><span>Achievement</span><strong><t t-esc="formatValue(target.achievement_percentage, 'number')"/>%</strong></div>
+                                <div class="o_target_line"><span>Remaining</span><strong t-esc="formatValue(target.remaining_target, 'currency')"/></div>
+                                <div class="o_target_line"><span>Required Average Daily Sales</span><strong t-esc="formatValue(target.required_average_daily_sales, 'currency')"/></div>
+                                <div class="o_target_line"><span>Orders Target Achievement</span><strong><t t-esc="formatValue(target.orders_target_achievement, 'number')"/>%</strong></div>
+                                <div class="o_target_line"><span>AOV Target Achievement</span><strong><t t-esc="formatValue(target.avg_order_value_target_achievement, 'number')"/>%</strong></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mt-1">
+                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.BarPanel"><t t-set="title" t-value="'Sales by Hour'"/><t t-set="rows" t-value="state.data.peak_hours || []"/><t t-set="labelKey" t-value="'label'"/><t t-set="valueKey" t-value="'sales_amount'"/></t></div>
+                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.BarPanel"><t t-set="title" t-value="'Sales by Day'"/><t t-set="rows" t-value="state.data.peak_days || []"/><t t-set="labelKey" t-value="'label'"/><t t-set="valueKey" t-value="'sales_amount'"/></t></div>
+                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.BarPanel"><t t-set="title" t-value="'Top Products'"/><t t-set="rows" t-value="state.data.top_products || []"/><t t-set="labelKey" t-value="'product_name'"/><t t-set="valueKey" t-value="'gross_sales'"/></t></div>
+                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.BarPanel"><t t-set="title" t-value="'Top Categories'"/><t t-set="rows" t-value="state.data.top_categories || []"/><t t-set="labelKey" t-value="'category_name'"/><t t-set="valueKey" t-value="'gross_sales'"/></t></div>
+                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.BarPanel"><t t-set="title" t-value="'Payment Method Breakdown'"/><t t-set="rows" t-value="state.data.payment_methods || []"/><t t-set="labelKey" t-value="'payment_method_name'"/><t t-set="valueKey" t-value="'amount'"/></t></div>
+                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.BarPanel"><t t-set="title" t-value="'Branch Comparison'"/><t t-set="rows" t-value="state.data.branch_comparison || []"/><t t-set="labelKey" t-value="'branch_name'"/><t t-set="valueKey" t-value="'total_sales'"/></t></div>
+                </div>
+
+                <div class="row g-3 mt-1">
+                    <div class="col-12"><t t-call="pos_advanced_analytics.WaiterTable"/></div>
+                    <div class="col-12"><t t-call="pos_advanced_analytics.CashierTable"/></div>
+                    <div class="col-12"><t t-call="pos_advanced_analytics.RefundDiscount"/></div>
+                </div>
+            </t>
+        </div>
+    </t>
+
+    <t t-name="pos_advanced_analytics.BarPanel">
+        <div class="card o_pos_analytics_panel">
+            <div class="card-header" t-esc="title"/>
+            <div class="card-body">
+                <div t-if="!rows.length" class="text-muted">No data.</div>
+                <div class="o_pos_analytics_bar" t-foreach="rows" t-as="row" t-key="row[labelKey]">
+                    <span class="o_label" t-esc="row[labelKey]"/>
+                    <span class="o_bar"><span t-att-style="'width:' + barWidth(row[valueKey], rows, valueKey)"/></span>
+                    <span class="o_value" t-esc="formatValue(row[valueKey], 'currency')"/>
+                </div>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="pos_advanced_analytics.WaiterTable">
+        <div class="card o_pos_analytics_panel">
+            <div class="card-header">Waiter Performance</div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead><tr><th>Waiter</th><th class="text-end">Sales</th><th class="text-end">Orders</th><th class="text-end">AOV</th><th class="text-end">Qty</th><th class="text-end">Refunds</th><th class="text-end">Discounts</th></tr></thead>
+                    <tbody>
+                        <tr t-if="!(state.data.waiter_performance || []).length"><td colspan="7" class="text-muted">No waiter data.</td></tr>
+                        <tr t-foreach="state.data.waiter_performance || []" t-as="row" t-key="row.waiter_id || row.waiter_name">
+                            <td t-esc="row.waiter_name"/><td class="text-end" t-esc="formatValue(row.total_sales, 'currency')"/><td class="text-end" t-esc="formatValue(row.total_orders, 'number')"/><td class="text-end" t-esc="formatValue(row.average_order_value, 'currency')"/><td class="text-end" t-esc="formatValue(row.quantity_sold, 'number')"/><td class="text-end" t-esc="formatValue(row.refunds, 'currency')"/><td class="text-end" t-esc="formatValue(row.discounts, 'currency')"/>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="pos_advanced_analytics.CashierTable">
+        <div class="card o_pos_analytics_panel">
+            <div class="card-header">Cashier Performance</div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead><tr><th>Cashier</th><th class="text-end">Collected</th><th class="text-end">Orders</th><th class="text-end">Average Ticket</th><th class="text-end">Refunds</th><th class="text-end">Discounts</th><th>Payments</th></tr></thead>
+                    <tbody>
+                        <tr t-if="!(state.data.cashier_performance || []).length"><td colspan="7" class="text-muted">No cashier data.</td></tr>
+                        <tr t-foreach="state.data.cashier_performance || []" t-as="row" t-key="row.cashier_id || row.cashier_name">
+                            <td t-esc="row.cashier_name"/><td class="text-end" t-esc="formatValue(row.total_collected, 'currency')"/><td class="text-end" t-esc="formatValue(row.number_of_orders, 'number')"/><td class="text-end" t-esc="formatValue(row.average_ticket_size, 'currency')"/><td class="text-end" t-esc="formatValue(row.refunds, 'currency')"/><td class="text-end" t-esc="formatValue(row.discounts, 'currency')"/><td t-esc="formatValue(row.payment_method_breakdown, 'text')"/>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="pos_advanced_analytics.RefundDiscount">
+        <div class="card o_pos_analytics_panel">
+            <div class="card-header">Refund and Discount Analytics</div>
+            <div class="card-body o_refund_grid">
+                <t t-set="refund" t-value="state.data.refund_discount_summary || {}"/>
+                <div><span>Total Refund Amount</span><strong t-esc="formatValue(refund.total_refund_amount, 'currency')"/></div>
+                <div><span>Refund Order Count</span><strong t-esc="formatValue(refund.refund_order_count, 'number')"/></div>
+                <div><span>Discount Amount</span><strong t-esc="formatValue(refund.discount_amount, 'currency')"/></div>
+                <div><span>Discounted Order Count</span><strong t-esc="formatValue(refund.discounted_order_count, 'number')"/></div>
+            </div>
+        </div>
+    </t>
+</templates>

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pos_analytics_report_wizard_form" model="ir.ui.view">
+        <field name="name">pos.analytics.report.wizard.form</field>
+        <field name="model">pos.analytics.report.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Generate POS Analytics Report">
+                <sheet>
+                    <group>
+                        <group string="Date and Report">
+                            <field name="date_start"/>
+                            <field name="date_end"/>
+                            <field name="report_type"/>
+                            <field name="group_by"/>
+                            <field name="report_basis"/>
+                            <field name="order_state"/>
+                        </group>
+                        <group string="Options">
+                            <field name="include_summary"/>
+                            <field name="include_raw_orders"/>
+                            <field name="export_format"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Branches and People">
+                            <group>
+                                <field name="pos_config_ids" widget="many2many_tags"/>
+                                <field name="cashier_ids" widget="many2many_tags"/>
+                                <field name="waiter_ids" widget="many2many_tags"/>
+                            </group>
+                        </page>
+                        <page string="Products and Payments">
+                            <group>
+                                <field name="product_category_ids" widget="many2many_tags"/>
+                                <field name="product_ids" widget="many2many_tags"/>
+                                <field name="payment_method_ids" widget="many2many_tags"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <footer>
+                    <button name="action_generate_pdf" type="object" string="Generate PDF" class="btn-primary" groups="pos_advanced_analytics.group_pos_analytics_user"/>
+                    <button name="action_generate_excel" type="object" string="Generate Excel" class="btn-secondary" groups="pos_advanced_analytics.group_pos_analytics_manager"/>
+                    <button string="Cancel" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

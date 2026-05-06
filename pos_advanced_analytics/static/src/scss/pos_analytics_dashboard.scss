@@ -1,0 +1,119 @@
+.o_pos_analytics_dashboard {
+    padding: 24px;
+    background: #f3f4f6;
+    min-height: 100%;
+
+    .o_pos_analytics_header {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: center;
+        margin-bottom: 18px;
+
+        h1 { margin: 0; font-weight: 700; color: #111827; }
+        p { margin: 4px 0 0; color: #6b7280; }
+        .o_pos_analytics_actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    }
+
+    .o_pos_analytics_filters {
+        margin-bottom: 18px;
+        border: 0;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, .06);
+        label { font-size: 12px; font-weight: 700; color: #374151; margin-bottom: 4px; }
+        select[multiple] { min-height: 76px; }
+    }
+
+    .o_pos_analytics_loading,
+    .o_pos_analytics_empty {
+        border: 0;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, .06);
+        margin-bottom: 18px;
+    }
+
+    .o_pos_analytics_kpis {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 14px;
+        margin-bottom: 18px;
+    }
+
+    .o_pos_analytics_kpi,
+    .o_pos_analytics_panel {
+        border: 0;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, .06);
+        border-radius: 16px;
+        overflow: hidden;
+    }
+
+    .o_pos_analytics_kpi_label {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: #6b7280;
+        font-weight: 800;
+    }
+
+    .o_pos_analytics_kpi_value {
+        font-size: 24px;
+        font-weight: 800;
+        color: #111827;
+        margin-top: 8px;
+        line-height: 1.15;
+        word-break: break-word;
+    }
+
+    .card-header {
+        background: #ffffff;
+        border-bottom: 1px solid #e5e7eb;
+        font-weight: 800;
+        color: #111827;
+    }
+
+    .o_pos_analytics_bar {
+        display: grid;
+        grid-template-columns: minmax(90px, 180px) 1fr minmax(90px, auto);
+        align-items: center;
+        gap: 10px;
+        margin: 8px 0;
+        font-size: 13px;
+
+        .o_label { color: #374151; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .o_value { color: #111827; font-weight: 700; text-align: right; }
+        .o_bar {
+            height: 12px;
+            border-radius: 999px;
+            background: #e5e7eb;
+            overflow: hidden;
+            span {
+                display: block;
+                height: 100%;
+                border-radius: 999px;
+                background: linear-gradient(90deg, #2563eb, #14b8a6);
+                min-width: 2px;
+            }
+        }
+    }
+
+    .o_target_line,
+    .o_refund_grid > div {
+        display: flex;
+        justify-content: space-between;
+        border-bottom: 1px solid #f3f4f6;
+        padding: 8px 0;
+        span { color: #6b7280; }
+        strong { color: #111827; }
+    }
+
+    .o_refund_grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+    }
+
+    @media (max-width: 768px) {
+        padding: 12px;
+        .o_pos_analytics_header { align-items: flex-start; flex-direction: column; }
+        .o_pos_analytics_bar { grid-template-columns: 1fr; }
+        .o_pos_analytics_bar .o_value { text-align: left; }
+    }
+}
