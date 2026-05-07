@@ -66,7 +66,7 @@ class PosAnalyticsService(models.AbstractModel):
         cashiers = self.env["res.users"].search([], order="name")
         waiters = self.env["hr.employee"].search([("company_id", "in", company_ids)], order="name")
         categories = self.env["product.category"].search([], order="complete_name")
-        products = self.env["product.product"].search([("sale_ok", "=", True)], order="display_name", limit=2000)
+        products = self.env["product.product"].search([("sale_ok", "=", True)], limit=2000)
         methods = self.env["pos.payment.method"].search([("company_id", "in", company_ids + [False])], order="name")
         ICP = self.env["ir.config_parameter"].sudo()
         return {
@@ -132,7 +132,26 @@ class PosAnalyticsService(models.AbstractModel):
         ]).get(filters.get("report_basis"), "sales_including_tax")
 
     def _name_get_payload(self, records):
-        return [{"id": rec.id, "name": rec.display_name} for rec in records]
+        return sorted(
+            [{"id": rec.id, "name": rec.display_name} for rec in records],
+            key=lambda item: item["name"] or "",
+        )
+
+    def _localized_value(self, value):
+        if isinstance(value, dict):
+            lang = self.env.lang or "en_US"
+            value = value.get(lang) or value.get("en_US") or next((item for item in value.values() if item), "")
+        return str(value or "")
+
+    def _normalize_payment_name_rows(self, rows):
+        for row in rows:
+            row["payment_method_name"] = self._localized_value(row.get("payment_method_name"))
+        return rows
+
+    def _normalize_group_label_rows(self, rows):
+        for row in rows:
+            row["group_label"] = self._localized_value(row.get("group_label"))
+        return rows
 
     def _normalize_filters(self, filters):
         ICP = self.env["ir.config_parameter"].sudo()
@@ -600,12 +619,13 @@ class PosAnalyticsService(models.AbstractModel):
         """, params)
         journal_ids = [r["journal_id"] for r in rows if r.get("journal_id")]
         journal_types = {j.id: j.type for j in self.env["account.journal"].browse(journal_ids)}
+        self._normalize_payment_name_rows(rows)
         for row in rows:
             row["method_type"] = self._classify_payment(row["payment_method_name"], journal_types.get(row.get("journal_id")))
         return rows
 
     def _classify_payment(self, name, journal_type=None):
-        lower = (name or "").lower()
+        lower = self._localized_value(name).lower()
         if journal_type == "cash" or "cash" in lower:
             return "cash"
         if any(token in lower for token in ("mobile", "momo", "telebirr", "mpesa", "wallet")):
@@ -634,6 +654,7 @@ class PosAnalyticsService(models.AbstractModel):
             GROUP BY COALESCE(po.user_id, 0), ppm.name
             ORDER BY amount DESC
         """, params)
+        self._normalize_payment_name_rows(rows)
         grouped = defaultdict(list)
         for row in rows:
             grouped[row["cashier_id"]].append(row)
@@ -914,6 +935,7 @@ class PosAnalyticsService(models.AbstractModel):
             WHERE {where}
             GROUP BY business_date, pc.name, ps.name, cashier_name, ppm.name, ppm.journal_id
         """, [filters["timezone"]] + params)
+        self._normalize_payment_name_rows(rows)
         journal_ids = [r["journal_id"] for r in rows if r.get("journal_id")]
         journal_types = {j.id: j.type for j in self.env["account.journal"].browse(journal_ids)}
         grouped = defaultdict(lambda: {"cash": 0.0, "bank": 0.0, "mobile": 0.0, "other": 0.0, "breakdown": []})
@@ -1162,6 +1184,8 @@ class PosAnalyticsService(models.AbstractModel):
             GROUP BY {groupby}, ppm.name
             ORDER BY group_label, amount DESC
         """, extra_params + params)
+        self._normalize_group_label_rows(rows)
+        self._normalize_payment_name_rows(rows)
         return rows
 
     def _get_tax_details(self, filters):
@@ -1227,7 +1251,7 @@ class PosAnalyticsService(models.AbstractModel):
             GROUP BY pc.name, ps.name, ppm.name
             ORDER BY branch_name, session_name, amount DESC
         """, params)
-        return rows
+        return self._normalize_payment_name_rows(rows)
 
     def _daily_closing_cashier_rows(self, filters):
         rows = self._get_cashier_performance(filters, limit=500)
@@ -1270,10 +1294,14 @@ class PosAnalyticsService(models.AbstractModel):
         if not order_ids:
             return {}
         rows = self._fetchall_dict("""
-            SELECT pp.pos_order_id AS order_id, STRING_AGG(ppm.name, ', ' ORDER BY ppm.name) AS payment_methods
+            SELECT pp.pos_order_id AS order_id, ppm.name AS payment_method_name
             FROM pos_payment pp
             JOIN pos_payment_method ppm ON ppm.id = pp.payment_method_id
             WHERE pp.pos_order_id = ANY(%s)
-            GROUP BY pp.pos_order_id
+            ORDER BY pp.pos_order_id, ppm.name
         """, [order_ids])
-        return {r["order_id"]: r["payment_methods"] for r in rows}
+        grouped = defaultdict(list)
+        self._normalize_payment_name_rows(rows)
+        for row in rows:
+            grouped[row["order_id"]].append(row["payment_method_name"])
+        return {order_id: ", ".join(methods) for order_id, methods in grouped.items()}
