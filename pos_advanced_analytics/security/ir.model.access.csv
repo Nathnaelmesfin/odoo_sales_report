@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_pos_analytics_target_user,pos.analytics.target.user,model_pos_analytics_target,pos_advanced_analytics.group_pos_analytics_user,1,0,0,0
+access_pos_analytics_target_manager,pos.analytics.target.manager,model_pos_analytics_target,pos_advanced_analytics.group_pos_analytics_manager,1,1,1,1
+access_pos_analytics_report_wizard_user,pos.analytics.report.wizard.user,model_pos_analytics_report_wizard,pos_advanced_analytics.group_pos_analytics_user,1,1,1,1
+access_pos_analytics_report_wizard_manager,pos.analytics.report.wizard.manager,model_pos_analytics_report_wizard,pos_advanced_analytics.group_pos_analytics_manager,1,1,1,1
