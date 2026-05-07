@@ -12,7 +12,7 @@
               parent="pos_advanced_analytics.menu_pos_analytics_root"
               action="pos_advanced_analytics.action_pos_analytics_dashboard"
               sequence="10"
-              groups="pos_advanced_analytics.group_pos_analytics_user,pos_advanced_analytics.group_pos_analytics_manager"/>
+              groups="pos_advanced_analytics.group_pos_analytics_user"/>
 
     <menuitem id="menu_pos_analytics_reports"
               name="Reports"
