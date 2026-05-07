@@ -216,6 +216,19 @@ export class PosAnalyticsDashboard extends Component {
         return values.map((value, index) => `${index * step},${90 - (value / max) * 80}`).join(" ");
     }
 
+    linePointMarkers(rows, valueKey = "total_sales") {
+        const values = (rows || []).map((row) => Number(row[valueKey] || 0));
+        if (!values.length) return [];
+        const max = Math.max(...values, 1);
+        const step = values.length > 1 ? 300 / (values.length - 1) : 300;
+        return (rows || []).map((row, index) => ({
+            label: row.label || row.period_key || "—",
+            value: Number(row[valueKey] || 0),
+            x: index * step,
+            y: 90 - (Number(row[valueKey] || 0) / max) * 80,
+        }));
+    }
+
     donutSegments(rows, valueKey = "amount") {
         const values = (rows || []).map((row) => Number(row[valueKey] || 0));
         const total = values.reduce((sum, value) => sum + value, 0);

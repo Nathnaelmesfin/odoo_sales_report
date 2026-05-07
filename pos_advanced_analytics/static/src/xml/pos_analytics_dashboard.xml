@@ -109,7 +109,7 @@
                                 <t t-if="!(state.data.sales_trend || []).length"><div class="text-muted">No trend data.</div></t>
                                 <svg t-if="(state.data.sales_trend || []).length" class="o_svg_line_chart" viewBox="0 0 320 110" preserveAspectRatio="none">
                                     <defs><linearGradient id="paaTrend" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#2563eb" stop-opacity=".35"/><stop offset="100%" stop-color="#2563eb" stop-opacity="0"/></linearGradient></defs>
-                                    <polyline t-att-points="linePoints(state.data.sales_trend, 'total_sales')" fill="none" stroke="#2563eb" stroke-width="3"/>
+                                    <line x1="0" y1="95" x2="320" y2="95" stroke="#cbd5e1" stroke-width="1"/><line x1="0" y1="5" x2="0" y2="95" stroke="#cbd5e1" stroke-width="1"/><polyline t-att-points="linePoints(state.data.sales_trend, 'total_sales')" fill="none" stroke="#2563eb" stroke-width="3"/><circle t-foreach="linePointMarkers(state.data.sales_trend, 'total_sales')" t-as="pt" t-key="pt.label" t-att-cx="pt.x" t-att-cy="pt.y" r="4" fill="#ffffff" stroke="#2563eb" stroke-width="2"><title><t t-esc="pt.label"/>: <t t-esc="formatValue(pt.value, 'currency')"/></title></circle>
                                 </svg>
                                 <div class="o_chart_labels"><span t-foreach="state.data.sales_trend || []" t-as="row" t-key="row.label"><t t-esc="row.label"/>: <strong t-esc="formatValue(row.total_sales, 'currency')"/></span></div>
                             </div>
@@ -135,11 +135,11 @@
                 <div class="row g-3 mt-1">
                     <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.SvgBarChart"><t t-set="title" t-value="'Sales by Hour'"/><t t-set="rows" t-value="state.data.peak_hours || []"/><t t-set="labelKey" t-value="'label'"/><t t-set="valueKey" t-value="'sales_amount'"/></t></div>
                     <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.SvgBarChart"><t t-set="title" t-value="'Sales by Day'"/><t t-set="rows" t-value="state.data.peak_days || []"/><t t-set="labelKey" t-value="'label'"/><t t-set="valueKey" t-value="'sales_amount'"/></t></div>
-                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.SvgBarChart"><t t-set="title" t-value="'Top Products'"/><t t-set="rows" t-value="state.data.top_products || []"/><t t-set="labelKey" t-value="'product_name'"/><t t-set="valueKey" t-value="'gross_sales'"/></t></div>
-                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.SvgBarChart"><t t-set="title" t-value="'Top Categories'"/><t t-set="rows" t-value="state.data.top_categories || []"/><t t-set="labelKey" t-value="'category_name'"/><t t-set="valueKey" t-value="'gross_sales'"/></t></div>
+                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.SvgBarChart"><t t-set="title" t-value="'Top Products'"/><t t-set="rows" t-value="state.data.top_products || []"/><t t-set="labelKey" t-value="'product_name'"/><t t-set="valueKey" t-value="'basis_amount'"/></t></div>
+                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.SvgBarChart"><t t-set="title" t-value="'Top Categories'"/><t t-set="rows" t-value="state.data.top_categories || []"/><t t-set="labelKey" t-value="'category_name'"/><t t-set="valueKey" t-value="'basis_amount'"/></t></div>
                     <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.DonutChart"><t t-set="title" t-value="'Payment Method Breakdown'"/><t t-set="rows" t-value="state.data.payment_methods || []"/><t t-set="labelKey" t-value="'payment_method_name'"/><t t-set="valueKey" t-value="'amount'"/></t></div>
                     <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.SvgBarChart"><t t-set="title" t-value="'Branch Comparison'"/><t t-set="rows" t-value="state.data.branch_comparison || []"/><t t-set="labelKey" t-value="'branch_name'"/><t t-set="valueKey" t-value="'total_sales'"/></t></div>
-                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.DonutChart"><t t-set="title" t-value="'Category Share'"/><t t-set="rows" t-value="state.data.top_categories || []"/><t t-set="labelKey" t-value="'category_name'"/><t t-set="valueKey" t-value="'gross_sales'"/></t></div>
+                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.DonutChart"><t t-set="title" t-value="'Category Share'"/><t t-set="rows" t-value="state.data.top_categories || []"/><t t-set="labelKey" t-value="'category_name'"/><t t-set="valueKey" t-value="'basis_amount'"/></t></div>
                     <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.HeatmapChart"/></div>
                 </div>
 
@@ -147,6 +147,11 @@
                     <div t-if="(state.data.settings || {}).enable_waiter_analytics" class="col-12"><t t-call="pos_advanced_analytics.WaiterTable"/></div>
                     <div t-if="(state.data.settings || {}).enable_cashier_analytics" class="col-12"><t t-call="pos_advanced_analytics.CashierTable"/></div>
                     <div class="col-12"><t t-call="pos_advanced_analytics.RefundDiscount"/></div>
+                    <div class="col-12"><t t-call="pos_advanced_analytics.BranchPerformanceTable"/></div>
+                    <div class="col-12"><t t-call="pos_advanced_analytics.ProductDetailTable"/></div>
+                    <div class="col-12"><t t-call="pos_advanced_analytics.CategoryDetailTable"/></div>
+                    <div class="col-12"><t t-call="pos_advanced_analytics.PaymentDetailTables"/></div>
+                    <div class="col-12"><t t-call="pos_advanced_analytics.RefundDiscountBreakdowns"/></div>
                 </div>
             </t>
         </div>
@@ -238,4 +243,52 @@
             </div>
         </div>
     </t>
+
+    <t t-name="pos_advanced_analytics.BranchPerformanceTable">
+        <div class="card o_pos_analytics_panel"><div class="card-header">Branch Performance</div><div class="table-responsive"><table class="table table-hover mb-0">
+            <thead><tr><th>Branch</th><th class="text-end">Basis</th><th class="text-end">Net</th><th class="text-end">Orders</th><th class="text-end">AOV</th><th>Top Product</th><th>Top Category</th><th>Peak Hour</th><th>Peak Day</th></tr></thead>
+            <tbody><tr t-if="!(state.data.branch_comparison || []).length"><td colspan="9" class="text-muted">No branch data.</td></tr><tr t-foreach="state.data.branch_comparison || []" t-as="row" t-key="row.branch_id"><td t-esc="row.branch_name"/><td class="text-end" t-esc="formatValue(row.total_sales, 'currency')"/><td class="text-end" t-esc="formatValue(row.net_sales, 'currency')"/><td class="text-end" t-esc="formatValue(row.total_orders, 'number')"/><td class="text-end" t-esc="formatValue(row.average_order_value, 'currency')"/><td t-esc="row.top_product"/><td t-esc="row.top_category"/><td t-esc="row.peak_hour"/><td t-esc="row.peak_day"/></tr></tbody>
+        </table></div></div>
+    </t>
+
+    <t t-name="pos_advanced_analytics.ProductDetailTable">
+        <div class="card o_pos_analytics_panel"><div class="card-header">Product Details</div><div class="table-responsive"><table class="table table-hover mb-0">
+            <thead><tr><th>Product</th><th>Category</th><th class="text-end">Qty</th><th class="text-end">Basis</th><th class="text-end">Gross</th><th class="text-end">Net</th><th class="text-end">Discounts</th><th class="text-end">Refund Qty</th><th class="text-end">Refund</th></tr></thead>
+            <tbody><tr t-if="!(state.data.top_products || []).length"><td colspan="9" class="text-muted">No product data.</td></tr><tr t-foreach="state.data.top_products || []" t-as="row" t-key="row.product_id"><td t-esc="row.product_name"/><td t-esc="row.category_name"/><td class="text-end" t-esc="formatValue(row.quantity_sold, 'number')"/><td class="text-end" t-esc="formatValue(row.basis_amount, 'currency')"/><td class="text-end" t-esc="formatValue(row.gross_sales, 'currency')"/><td class="text-end" t-esc="formatValue(row.net_sales, 'currency')"/><td class="text-end" t-esc="formatValue(row.discount_amount, 'currency')"/><td class="text-end" t-esc="formatValue(row.refund_quantity, 'number')"/><td class="text-end" t-esc="formatValue(row.refund_amount, 'currency')"/></tr></tbody>
+        </table></div></div>
+    </t>
+
+    <t t-name="pos_advanced_analytics.CategoryDetailTable">
+        <div class="card o_pos_analytics_panel"><div class="card-header">Category Details</div><div class="table-responsive"><table class="table table-hover mb-0">
+            <thead><tr><th>Category</th><th class="text-end">Qty</th><th class="text-end">Basis</th><th class="text-end">Gross</th><th class="text-end">Net</th><th class="text-end">Discounts</th><th class="text-end">Refund Qty</th><th class="text-end">Refund</th></tr></thead>
+            <tbody><tr t-if="!(state.data.top_categories || []).length"><td colspan="8" class="text-muted">No category data.</td></tr><tr t-foreach="state.data.top_categories || []" t-as="row" t-key="row.category_id || row.category_name"><td t-esc="row.category_name"/><td class="text-end" t-esc="formatValue(row.quantity_sold, 'number')"/><td class="text-end" t-esc="formatValue(row.basis_amount, 'currency')"/><td class="text-end" t-esc="formatValue(row.gross_sales, 'currency')"/><td class="text-end" t-esc="formatValue(row.net_sales, 'currency')"/><td class="text-end" t-esc="formatValue(row.discount_amount, 'currency')"/><td class="text-end" t-esc="formatValue(row.refund_quantity, 'number')"/><td class="text-end" t-esc="formatValue(row.refund_amount, 'currency')"/></tr></tbody>
+        </table></div></div>
+    </t>
+
+    <t t-name="pos_advanced_analytics.PaymentDetailTables">
+        <div class="card o_pos_analytics_panel"><div class="card-header">Payment Analytics Details</div><div class="card-body">
+            <div class="row g-3"><div class="col-12 col-lg-4"><t t-call="pos_advanced_analytics.PaymentMiniTable"><t t-set="title" t-value="'Payment Methods'"/><t t-set="rows" t-value="(state.data.payment_analytics || {}).summary || []"/></t></div><div class="col-12 col-lg-4"><t t-call="pos_advanced_analytics.PaymentMiniTable"><t t-set="title" t-value="'Payment by Branch'"/><t t-set="rows" t-value="(state.data.payment_analytics || {}).branch_breakdown || []"/></t></div><div t-if="(state.data.settings || {}).enable_cashier_analytics" class="col-12 col-lg-4"><t t-call="pos_advanced_analytics.PaymentMiniTable"><t t-set="title" t-value="'Payment by Cashier'"/><t t-set="rows" t-value="(state.data.payment_analytics || {}).cashier_breakdown || []"/></t></div></div>
+        </div></div>
+    </t>
+    <t t-name="pos_advanced_analytics.PaymentMiniTable"><h6 t-esc="title"/><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Group/Method</th><th class="text-end">Orders</th><th class="text-end">Amount</th></tr></thead><tbody><tr t-if="!rows.length"><td colspan="3" class="text-muted">No data.</td></tr><tr t-foreach="rows" t-as="row" t-key="(row.group_label || row.payment_method_name) + row.amount"><td t-esc="row.group_label || row.payment_method_name"/><td class="text-end" t-esc="formatValue(row.order_count, 'number')"/><td class="text-end" t-esc="formatValue(row.amount, 'currency')"/></tr></tbody></table></div></t>
+
+    <t t-name="pos_advanced_analytics.RefundDiscountBreakdowns">
+        <div class="card o_pos_analytics_panel"><div class="card-header">Refund &amp; Discount Breakdowns</div><div class="card-body"><t t-set="refund" t-value="state.data.refund_discount_summary || {}"/><div class="row g-3">
+            <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.RefundMiniTable"><t t-set="title" t-value="'Refund by Product'"/><t t-set="rows" t-value="refund.refund_by_product || []"/></t></div>
+            <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.RefundMiniTable"><t t-set="title" t-value="'Refund by Category'"/><t t-set="rows" t-value="refund.refund_by_category || []"/></t></div>
+            <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.RefundMiniTable"><t t-set="title" t-value="'Refund by Cashier'"/><t t-set="rows" t-value="refund.refund_by_cashier || []"/></t></div>
+            <div t-if="(state.data.settings || {}).enable_waiter_analytics" class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.RefundMiniTable"><t t-set="title" t-value="'Refund by Waiter'"/><t t-set="rows" t-value="refund.refund_by_waiter || []"/></t></div>
+            <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.RefundMiniTable"><t t-set="title" t-value="'Refund by Branch'"/><t t-set="rows" t-value="refund.refund_by_branch || []"/></t></div>
+            <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.RefundMiniTable"><t t-set="title" t-value="'Refund by Date'"/><t t-set="rows" t-value="refund.refund_by_date || []"/></t></div>
+            <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.DiscountMiniTable"><t t-set="title" t-value="'Discount by Product'"/><t t-set="rows" t-value="refund.discount_by_product || []"/></t></div>
+            <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.DiscountMiniTable"><t t-set="title" t-value="'Discount by Category'"/><t t-set="rows" t-value="refund.discount_by_category || []"/></t></div>
+            <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.DiscountMiniTable"><t t-set="title" t-value="'Discount by Cashier'"/><t t-set="rows" t-value="refund.discount_by_cashier || []"/></t></div>
+            <div t-if="(state.data.settings || {}).enable_waiter_analytics" class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.DiscountMiniTable"><t t-set="title" t-value="'Discount by Waiter'"/><t t-set="rows" t-value="refund.discount_by_waiter || []"/></t></div>
+            <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.DiscountMiniTable"><t t-set="title" t-value="'Discount by Branch'"/><t t-set="rows" t-value="refund.discount_by_branch || []"/></t></div>
+            <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.DiscountMiniTable"><t t-set="title" t-value="'Discount by Date'"/><t t-set="rows" t-value="refund.discount_by_date || []"/></t></div>
+        </div></div></div>
+    </t>
+    <t t-name="pos_advanced_analytics.RefundMiniTable"><h6 t-esc="title"/><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Group</th><th class="text-end">Refund</th><th class="text-end">Qty</th><th class="text-end">Orders</th></tr></thead><tbody><tr t-if="!rows.length"><td colspan="4" class="text-muted">No data.</td></tr><tr t-foreach="rows" t-as="row" t-key="row.name"><td t-esc="row.name"/><td class="text-end" t-esc="formatValue(row.refund_amount, 'currency')"/><td class="text-end" t-esc="formatValue(row.refund_quantity, 'number')"/><td class="text-end" t-esc="formatValue(row.order_count, 'number')"/></tr></tbody></table></div></t>
+    <t t-name="pos_advanced_analytics.DiscountMiniTable"><h6 t-esc="title"/><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Group</th><th class="text-end">Discount</th></tr></thead><tbody><tr t-if="!rows.length"><td colspan="2" class="text-muted">No data.</td></tr><tr t-foreach="rows" t-as="row" t-key="row.name"><td t-esc="row.name"/><td class="text-end" t-esc="formatValue(row.discount_amount, 'currency')"/></tr></tbody></table></div></t>
+
 </templates>

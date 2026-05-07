@@ -19,9 +19,7 @@ class PosAnalyticsReportWizard(models.TransientModel):
     product_category_ids = fields.Many2many("product.category", string="Product Categories")
     product_ids = fields.Many2many("product.product", string="Products")
     payment_method_ids = fields.Many2many("pos.payment.method", string="Payment Methods")
-    order_state = fields.Selection([
-        ("all", "All Valid Orders"), ("paid", "Paid"), ("done", "Done"), ("invoiced", "Invoiced"),
-    ], default="all", required=True)
+    order_state = fields.Selection(selection="_selection_order_state", default="all", required=True)
     report_type = fields.Selection([
         ("sales_summary", "Sales Summary Report"),
         ("daily_closing", "Daily Closing Report"),
@@ -53,6 +51,14 @@ class PosAnalyticsReportWizard(models.TransientModel):
     include_summary = fields.Boolean(string="Include Summary", default=True)
     export_format = fields.Selection([("pdf", "PDF"), ("xlsx", "Excel")], default="pdf", required=True)
     company_id = fields.Many2one("res.company", default=lambda self: self.env.company, required=True)
+
+    def _selection_order_state(self):
+        selection = [("all", "All Valid Orders"), ("paid", "Paid"), ("done", "Done"), ("invoiced", "Invoiced")]
+        pos_state_field = self.env["pos.order"]._fields.get("state")
+        state_keys = [item[0] for item in (pos_state_field.selection if pos_state_field else [])]
+        if "posted" in state_keys:
+            selection.append(("posted", "Posted"))
+        return selection
 
     @api.constrains("date_start", "date_end")
     def _check_dates(self):

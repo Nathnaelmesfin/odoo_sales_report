@@ -55,6 +55,19 @@ class PosAnalyticsExcelReport(models.AbstractModel):
         }
 
     def _sheets_for_report(self, report_type, include_raw_orders=False):
+        settings = self.env["pos.analytics.service"]._get_settings()
+        refund_sheets = [
+            "Refund Summary", "Refund By Product", "Refund By Category", "Refund By Cashier",
+            "Refund By Branch", "Refund By Date", "Discount Summary", "Discount By Product",
+            "Discount By Category", "Discount By Cashier", "Discount By Branch", "Discount By Date",
+        ]
+        if settings.get("enable_waiter_analytics"):
+            refund_sheets.insert(4, "Refund By Waiter")
+            refund_sheets.insert(11, "Discount By Waiter")
+        payment_sheets = ["Payment Methods", "Payment Category Summary", "Payment By Branch", "Payment By Date"]
+        if settings.get("enable_cashier_analytics"):
+            payment_sheets.insert(2, "Payment By Cashier")
+        tax_sheets = ["Tax Summary", "Tax By Date", "Tax By Branch", "Tax By Category", "Tax By POS Session"]
         sheets = {
             "sales_summary": ["Grouped Summary", "Sales Trend", "Branch Comparison", "Payment Methods", "Refunds & Discounts", "Tax Summary"],
             "daily_closing": ["Daily Closing Summary", "Payment Breakdown", "Cashier Breakdown", "Waiter Breakdown", "Order Summary"],
@@ -62,15 +75,15 @@ class PosAnalyticsExcelReport(models.AbstractModel):
             "category_sales": ["Grouped Summary", "Category Sales"],
             "waiter_performance": ["Grouped Summary", "Waiter Sales", "Product Sales"],
             "cashier_performance": ["Grouped Summary", "Cashier Sales", "Payment Methods"],
-            "branch_comparison": ["Grouped Summary", "Branch Comparison", "Payment Breakdown"],
+            "branch_comparison": ["Grouped Summary", "Branch Comparison", "Payment By Branch"],
             "hourly_sales": ["Grouped Summary", "Peak Hours", "Peak Hour Heatmap"],
             "daily_sales": ["Grouped Summary", "Sales Trend"],
-            "refund_discount": ["Refunds & Discounts", "Refund By Product", "Refund By Category", "Refund By Cashier", "Discount By Product", "Discount By Category", "Discount By Cashier"],
-            "payment_method": ["Grouped Summary", "Payment Methods", "Payment Breakdown"],
-            "tax": ["Tax Summary", "Tax By Date", "Tax By Branch", "Tax By Category", "Tax By Session"],
-            "management_summary": ["Grouped Summary", "Sales Trend", "Product Sales", "Category Sales", "Waiter Sales", "Cashier Sales", "Peak Hours", "Peak Days", "Peak Hour Heatmap", "Payment Methods", "Refunds & Discounts", "Tax Summary", "Branch Comparison"],
+            "refund_discount": refund_sheets,
+            "payment_method": payment_sheets,
+            "tax": tax_sheets,
+            "management_summary": ["Grouped Summary", "Sales Trend", "Product Sales", "Category Sales", "Waiter Sales", "Cashier Sales", "Peak Hours", "Peak Days", "Peak Hour Heatmap", "Payment Methods", "Payment By Branch", "Refunds & Discounts", "Tax Summary", "Branch Comparison"],
         }.get(report_type, [])
-        if include_raw_orders and "Order Summary" not in sheets:
+        if include_raw_orders and "Raw POS Orders" not in sheets and "Order Summary" not in sheets:
             sheets.append("Raw POS Orders")
         return sheets
 
@@ -91,18 +104,30 @@ class PosAnalyticsExcelReport(models.AbstractModel):
             "Peak Hour Heatmap": (data.get("peak_hour_day_heatmap", []), [("day_label", "Day"), ("hour", "Hour"), ("order_count", "Orders"), ("sales_amount", "Sales")]),
             "Payment Methods": (payment.get("summary", data.get("payment_methods", [])), [("payment_method_name", "Payment Method"), ("method_type", "Category"), ("order_count", "Orders"), ("amount", "Amount"), ("percentage", "Share %")]),
             "Payment Breakdown": (payment.get("branch_breakdown", []), [("group_label", "Group"), ("payment_method_name", "Payment Method"), ("order_count", "Orders"), ("amount", "Amount")]),
+            "Payment By Branch": (payment.get("branch_breakdown", []), [("group_label", "Branch"), ("payment_method_name", "Payment Method"), ("order_count", "Orders"), ("amount", "Amount")]),
+            "Payment By Cashier": (payment.get("cashier_breakdown", []), [("group_label", "Cashier"), ("payment_method_name", "Payment Method"), ("order_count", "Orders"), ("amount", "Amount")]),
+            "Payment By Date": (payment.get("date_breakdown", []), [("group_label", "Date"), ("payment_method_name", "Payment Method"), ("order_count", "Orders"), ("amount", "Amount")]),
+            "Payment Category Summary": (payment.get("category_summary", []), [("method_type", "Category"), ("order_count", "Orders"), ("amount", "Amount"), ("percentage", "Share %")]),
             "Refunds & Discounts": ([refund], [("total_refund_amount", "Refund Total"), ("refund_order_count", "Refund Orders"), ("refund_quantity", "Refund Quantity"), ("discount_amount", "Discount Total"), ("discounted_order_count", "Discounted Orders")]),
+            "Refund Summary": ([refund], [("total_refund_amount", "Refund Total"), ("refund_order_count", "Refund Orders"), ("refund_quantity", "Refund Quantity")]),
+            "Discount Summary": ([refund], [("discount_amount", "Discount Total"), ("discounted_order_count", "Discounted Orders")]),
             "Refund By Product": (refund.get("refund_by_product", []), [("name", "Product"), ("refund_amount", "Refund Amount"), ("refund_quantity", "Refund Quantity"), ("order_count", "Orders")]),
             "Refund By Category": (refund.get("refund_by_category", []), [("name", "Category"), ("refund_amount", "Refund Amount"), ("refund_quantity", "Refund Quantity"), ("order_count", "Orders")]),
             "Refund By Cashier": (refund.get("refund_by_cashier", []), [("name", "Cashier"), ("refund_amount", "Refund Amount"), ("refund_quantity", "Refund Quantity"), ("order_count", "Orders")]),
+            "Refund By Waiter": (refund.get("refund_by_waiter", []), [("name", "Waiter"), ("refund_amount", "Refund Amount"), ("refund_quantity", "Refund Quantity"), ("order_count", "Orders")]),
+            "Refund By Branch": (refund.get("refund_by_branch", []), [("name", "Branch"), ("refund_amount", "Refund Amount"), ("refund_quantity", "Refund Quantity"), ("order_count", "Orders")]),
+            "Refund By Date": (refund.get("refund_by_date", []), [("name", "Date"), ("refund_amount", "Refund Amount"), ("refund_quantity", "Refund Quantity"), ("order_count", "Orders")]),
             "Discount By Product": (refund.get("discount_by_product", []), [("name", "Product"), ("discount_amount", "Discount Amount")]),
             "Discount By Category": (refund.get("discount_by_category", []), [("name", "Category"), ("discount_amount", "Discount Amount")]),
             "Discount By Cashier": (refund.get("discount_by_cashier", []), [("name", "Cashier"), ("discount_amount", "Discount Amount")]),
+            "Discount By Waiter": (refund.get("discount_by_waiter", []), [("name", "Waiter"), ("discount_amount", "Discount Amount")]),
+            "Discount By Branch": (refund.get("discount_by_branch", []), [("name", "Branch"), ("discount_amount", "Discount Amount")]),
+            "Discount By Date": (refund.get("discount_by_date", []), [("name", "Date"), ("discount_amount", "Discount Amount")]),
             "Tax Summary": (data.get("tax_summary", []), [("branch_name", "Branch"), ("order_count", "Orders"), ("tax_amount", "Tax")]),
             "Tax By Date": (tax.get("by_date", []), [("group_label", "Date"), ("order_count", "Orders"), ("tax_amount", "Tax")]),
             "Tax By Branch": (tax.get("by_branch", []), [("group_label", "Branch"), ("order_count", "Orders"), ("tax_amount", "Tax")]),
             "Tax By Category": (tax.get("by_category", []), [("group_label", "Category"), ("order_count", "Orders"), ("tax_amount", "Tax")]),
-            "Tax By Session": (tax.get("by_session", []), [("group_label", "Session"), ("order_count", "Orders"), ("tax_amount", "Tax")]),
+            "Tax By POS Session": (tax.get("by_session", []), [("group_label", "Session"), ("order_count", "Orders"), ("tax_amount", "Tax")]),
             "Branch Comparison": (data.get("branch_comparison", []), [("branch_name", "Branch"), ("total_sales", "Sales"), ("net_sales", "Net Sales"), ("total_orders", "Orders"), ("average_order_value", "AOV"), ("top_product", "Top Product"), ("top_category", "Top Category"), ("peak_hour", "Peak Hour"), ("peak_day", "Peak Day")]),
             "Daily Closing Summary": (daily.get("summary", data.get("daily_closing", [])), [("business_date", "Date"), ("branch_name", "Branch"), ("session_name", "Session"), ("cashier_name", "Cashier"), ("opening_time", "Opening"), ("closing_time", "Closing"), ("opening_balance", "Opening Balance"), ("closing_balance", "Closing Balance"), ("total_sales", "Sales"), ("total_collected", "Collected"), ("net_sales", "Net Sales"), ("total_orders", "Orders"), ("cash_sales", "Cash"), ("bank_card_sales", "Bank/Card"), ("mobile_money_sales", "Mobile"), ("other_payment_methods", "Other"), ("refunds", "Refunds"), ("discounts", "Discounts"), ("tax", "Tax"), ("average_order_value", "AOV")]),
             "Cashier Breakdown": (daily.get("cashiers", []), [("cashier_name", "Cashier"), ("orders", "Orders"), ("total_sales", "Sales"), ("collected_amount", "Collected"), ("refunds", "Refunds"), ("discounts", "Discounts")]),
@@ -150,7 +175,7 @@ class PosAnalyticsExcelReport(models.AbstractModel):
                 continue
             row += 1
             sheet.write(row, 0, key.replace("_", " ").title(), formats["text"])
-            self._write_value(sheet, row, 1, value, formats)
+            self._write_value(sheet, row, 1, value, formats, key, key)
         sheet.set_column(0, 0, 36)
         sheet.set_column(1, 1, 28)
         sheet.freeze_panes(15, 0)
@@ -164,7 +189,7 @@ class PosAnalyticsExcelReport(models.AbstractModel):
         for r_index, row in enumerate(rows or [], header_row + 1):
             for c_index, (key, label) in enumerate(columns):
                 value = self._display_value(row.get(key, ""))
-                self._write_value(sheet, r_index, c_index, value, formats)
+                self._write_value(sheet, r_index, c_index, value, formats, key, label)
                 if isinstance(value, (int, float)):
                     totals[c_index] += value
         total_row = header_row + 1 + len(rows or [])
@@ -182,13 +207,18 @@ class PosAnalyticsExcelReport(models.AbstractModel):
                 sheet.conditional_format(header_row + 1, col, total_row - 1, col, {"type": "3_color_scale"})
         sheet.freeze_panes(header_row + 1, 0)
 
-    def _write_value(self, sheet, row, col, value, formats):
+    def _write_value(self, sheet, row, col, value, formats, key="", label=""):
+        key_l = (key or "").lower()
+        label_l = (label or "").lower()
+        is_money = any(token in key_l or token in label_l for token in ("amount", "sales", "collected", "refund", "discount", "tax", "paid", "return", "aov", "price", "total", "net", "cash", "bank", "mobile"))
+        is_count = any(token in key_l or token in label_l for token in ("count", "orders", "quantity", "qty"))
+        is_date = "date" in key_l or "time" in key_l or "opening" in key_l or "closing" in key_l
         if isinstance(value, int):
-            sheet.write(row, col, value, formats["integer"])
+            sheet.write(row, col, value, formats["integer"] if is_count else formats["number"])
         elif isinstance(value, float):
-            sheet.write(row, col, value, formats["number"])
+            sheet.write(row, col, value, formats["money"] if is_money else formats["number"])
         else:
-            sheet.write(row, col, value if value is not None else "", formats["text"])
+            sheet.write(row, col, value if value is not None else "", formats["date"] if is_date else formats["text"])
 
     def _display_value(self, value):
         if isinstance(value, list):

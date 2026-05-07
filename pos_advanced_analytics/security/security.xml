@@ -17,4 +17,11 @@
         <field name="category_id" ref="pos_advanced_analytics.module_category_pos_analytics"/>
         <field name="implied_ids" eval="[(4, ref('pos_advanced_analytics.group_pos_analytics_user'))]"/>
     </record>
+
+    <record id="rule_pos_analytics_target_company" model="ir.rule">
+        <field name="name">POS Analytics Target: allowed companies</field>
+        <field name="model_id" ref="model_pos_analytics_target"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        <field name="groups" eval="[(4, ref('pos_advanced_analytics.group_pos_analytics_user')), (4, ref('pos_advanced_analytics.group_pos_analytics_manager'))]"/>
+    </record>
 </odoo>
