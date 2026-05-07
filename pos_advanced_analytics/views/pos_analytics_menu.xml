@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <menuitem id="menu_pos_analytics_root"
-              name="Analytics"
+              name="POS Analytics"
               parent="point_of_sale.menu_point_root"
+              action="pos_advanced_analytics.action_pos_analytics_dashboard"
               sequence="70"
-              groups="pos_advanced_analytics.group_pos_analytics_user"/>
+              groups="pos_advanced_analytics.group_pos_analytics_user,pos_advanced_analytics.group_pos_analytics_manager"/>
 
     <menuitem id="menu_pos_analytics_dashboard"
               name="Live Dashboard"
@@ -18,7 +19,7 @@
               parent="pos_advanced_analytics.menu_pos_analytics_root"
               action="pos_advanced_analytics.action_pos_analytics_report_wizard"
               sequence="20"
-              groups="pos_advanced_analytics.group_pos_analytics_user"/>
+              groups="pos_advanced_analytics.group_pos_analytics_user,pos_advanced_analytics.group_pos_analytics_manager"/>
 
     <menuitem id="menu_pos_analytics_targets"
               name="Targets"
