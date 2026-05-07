@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_pos_analytics_root"
+              name="POS Analytics"
+              parent="point_of_sale.menu_point_root"
+              action="pos_advanced_analytics.action_pos_analytics_dashboard"
+              sequence="70"
+              groups="pos_advanced_analytics.group_pos_analytics_user,pos_advanced_analytics.group_pos_analytics_manager"/>
+
+    <menuitem id="menu_pos_analytics_dashboard"
+              name="Live Dashboard"
+              parent="pos_advanced_analytics.menu_pos_analytics_root"
+              action="pos_advanced_analytics.action_pos_analytics_dashboard"
+              sequence="10"
+              groups="pos_advanced_analytics.group_pos_analytics_user,pos_advanced_analytics.group_pos_analytics_manager"/>
+
+    <menuitem id="menu_pos_analytics_reports"
+              name="Reports"
+              parent="pos_advanced_analytics.menu_pos_analytics_root"
+              action="pos_advanced_analytics.action_pos_analytics_report_wizard"
+              sequence="20"
+              groups="pos_advanced_analytics.group_pos_analytics_user,pos_advanced_analytics.group_pos_analytics_manager"/>
+
+    <menuitem id="menu_pos_analytics_targets"
+              name="Targets"
+              parent="pos_advanced_analytics.menu_pos_analytics_root"
+              action="pos_advanced_analytics.action_pos_analytics_target"
+              sequence="30"
+              groups="pos_advanced_analytics.group_pos_analytics_manager"/>
+
+    <menuitem id="menu_pos_analytics_configuration"
+              name="Configuration"
+              parent="pos_advanced_analytics.menu_pos_analytics_root"
+              action="pos_advanced_analytics.action_pos_analytics_settings"
+              sequence="40"
+              groups="pos_advanced_analytics.group_pos_analytics_manager"/>
+</odoo>

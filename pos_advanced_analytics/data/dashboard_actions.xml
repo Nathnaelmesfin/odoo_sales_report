@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_pos_analytics_dashboard" model="ir.actions.client">
+        <field name="name">Live Dashboard</field>
+        <field name="tag">pos_advanced_analytics.dashboard</field>
+    </record>
+
+    <record id="action_pos_analytics_report_wizard" model="ir.actions.act_window">
+        <field name="name">POS Analytics Reports</field>
+        <field name="res_model">pos.analytics.report.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_include_summary': True}</field>
+    </record>
+</odoo>
