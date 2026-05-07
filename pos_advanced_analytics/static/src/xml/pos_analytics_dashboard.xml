@@ -92,8 +92,15 @@
             <div t-if="!state.loading and !state.error and !hasData" class="o_pos_analytics_empty card"><div class="card-body">No POS data was found for the selected filters.</div></div>
 
             <t t-if="hasData">
-                <div class="o_pos_analytics_kpis">
-                    <div class="o_pos_analytics_kpi card" t-foreach="kpiCards" t-as="kpi" t-key="kpi.key">
+                <div class="o_pos_analytics_section_title">
+                    <div>
+                        <h2>Executive Overview</h2>
+                        <p>Charts, leaderboards, and live operational tables are shown first so managers do not need to scroll through every KPI card.</p>
+                    </div>
+                </div>
+
+                <div class="o_pos_analytics_headline_kpis">
+                    <div class="o_pos_analytics_kpi o_pos_analytics_headline_kpi card" t-foreach="headlineKpiCards" t-as="kpi" t-key="kpi.key">
                         <div class="card-body">
                             <div class="o_pos_analytics_kpi_label" t-esc="kpi.label"/>
                             <div class="o_pos_analytics_kpi_value" t-esc="kpi.value"/>
@@ -101,9 +108,9 @@
                     </div>
                 </div>
 
-                <div class="row g-3">
-                    <div class="col-12 col-xl-8">
-                        <div class="card o_pos_analytics_panel">
+                <div class="row g-3 o_pos_analytics_top_grid">
+                    <div class="col-12 col-xl-7">
+                        <div class="card o_pos_analytics_panel o_pos_analytics_feature_panel">
                             <div class="card-header">Sales Trend</div>
                             <div class="card-body">
                                 <t t-if="!(state.data.sales_trend || []).length"><div class="text-muted">No trend data.</div></t>
@@ -115,6 +122,33 @@
                             </div>
                         </div>
                     </div>
+                    <div class="col-12 col-xl-5">
+                        <t t-call="pos_advanced_analytics.SvgBarChart"><t t-set="title" t-value="'Top Products'"/><t t-set="rows" t-value="state.data.top_products || []"/><t t-set="labelKey" t-value="'product_name'"/><t t-set="valueKey" t-value="'basis_amount'"/></t>
+                    </div>
+                    <div class="col-12 col-lg-4"><t t-call="pos_advanced_analytics.DonutChart"><t t-set="title" t-value="'Payment Method Breakdown'"/><t t-set="rows" t-value="state.data.payment_methods || []"/><t t-set="labelKey" t-value="'payment_method_name'"/><t t-set="valueKey" t-value="'amount'"/></t></div>
+                    <div class="col-12 col-lg-4"><t t-call="pos_advanced_analytics.SvgBarChart"><t t-set="title" t-value="'Top Categories'"/><t t-set="rows" t-value="state.data.top_categories || []"/><t t-set="labelKey" t-value="'category_name'"/><t t-set="valueKey" t-value="'basis_amount'"/></t></div>
+                    <div class="col-12 col-lg-4"><t t-call="pos_advanced_analytics.SvgBarChart"><t t-set="title" t-value="'Sales by Hour'"/><t t-set="rows" t-value="state.data.peak_hours || []"/><t t-set="labelKey" t-value="'label'"/><t t-set="valueKey" t-value="'sales_amount'"/></t></div>
+                    <div t-if="(state.data.settings || {}).enable_waiter_analytics" class="col-12 col-xl-6"><t t-call="pos_advanced_analytics.WaiterTable"/></div>
+                    <div t-if="(state.data.settings || {}).enable_cashier_analytics" class="col-12 col-xl-6"><t t-call="pos_advanced_analytics.CashierTable"/></div>
+                    <div class="col-12"><t t-call="pos_advanced_analytics.BranchPerformanceTable"/></div>
+                </div>
+
+                <div class="o_pos_analytics_section_title mt-3">
+                    <div>
+                        <h2>Operational KPI Cards</h2>
+                        <p>Additional POS indicators, peak-period metrics, and branch summaries.</p>
+                    </div>
+                </div>
+                <div class="o_pos_analytics_kpis">
+                    <div class="o_pos_analytics_kpi card" t-foreach="detailKpiCards" t-as="kpi" t-key="kpi.key">
+                        <div class="card-body">
+                            <div class="o_pos_analytics_kpi_label" t-esc="kpi.label"/>
+                            <div class="o_pos_analytics_kpi_value" t-esc="kpi.value"/>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mt-1">
                     <div t-if="(state.data.settings || {}).enable_target_cards" class="col-12 col-xl-4">
                         <div class="card o_pos_analytics_panel">
                             <div class="card-header">Target Summary</div>
@@ -130,24 +164,14 @@
                             </div>
                         </div>
                     </div>
-                </div>
-
-                <div class="row g-3 mt-1">
-                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.SvgBarChart"><t t-set="title" t-value="'Sales by Hour'"/><t t-set="rows" t-value="state.data.peak_hours || []"/><t t-set="labelKey" t-value="'label'"/><t t-set="valueKey" t-value="'sales_amount'"/></t></div>
-                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.SvgBarChart"><t t-set="title" t-value="'Sales by Day'"/><t t-set="rows" t-value="state.data.peak_days || []"/><t t-set="labelKey" t-value="'label'"/><t t-set="valueKey" t-value="'sales_amount'"/></t></div>
-                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.SvgBarChart"><t t-set="title" t-value="'Top Products'"/><t t-set="rows" t-value="state.data.top_products || []"/><t t-set="labelKey" t-value="'product_name'"/><t t-set="valueKey" t-value="'basis_amount'"/></t></div>
-                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.SvgBarChart"><t t-set="title" t-value="'Top Categories'"/><t t-set="rows" t-value="state.data.top_categories || []"/><t t-set="labelKey" t-value="'category_name'"/><t t-set="valueKey" t-value="'basis_amount'"/></t></div>
-                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.DonutChart"><t t-set="title" t-value="'Payment Method Breakdown'"/><t t-set="rows" t-value="state.data.payment_methods || []"/><t t-set="labelKey" t-value="'payment_method_name'"/><t t-set="valueKey" t-value="'amount'"/></t></div>
+                    <div class="col-12 col-xl-4"><t t-call="pos_advanced_analytics.SvgBarChart"><t t-set="title" t-value="'Sales by Day'"/><t t-set="rows" t-value="state.data.peak_days || []"/><t t-set="labelKey" t-value="'label'"/><t t-set="valueKey" t-value="'sales_amount'"/></t></div>
+                    <div class="col-12 col-xl-4"><t t-call="pos_advanced_analytics.HeatmapChart"/></div>
                     <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.SvgBarChart"><t t-set="title" t-value="'Branch Comparison'"/><t t-set="rows" t-value="state.data.branch_comparison || []"/><t t-set="labelKey" t-value="'branch_name'"/><t t-set="valueKey" t-value="'total_sales'"/></t></div>
                     <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.DonutChart"><t t-set="title" t-value="'Category Share'"/><t t-set="rows" t-value="state.data.top_categories || []"/><t t-set="labelKey" t-value="'category_name'"/><t t-set="valueKey" t-value="'basis_amount'"/></t></div>
-                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.HeatmapChart"/></div>
                 </div>
 
                 <div class="row g-3 mt-1">
-                    <div t-if="(state.data.settings || {}).enable_waiter_analytics" class="col-12"><t t-call="pos_advanced_analytics.WaiterTable"/></div>
-                    <div t-if="(state.data.settings || {}).enable_cashier_analytics" class="col-12"><t t-call="pos_advanced_analytics.CashierTable"/></div>
                     <div class="col-12"><t t-call="pos_advanced_analytics.RefundDiscount"/></div>
-                    <div class="col-12"><t t-call="pos_advanced_analytics.BranchPerformanceTable"/></div>
                     <div class="col-12"><t t-call="pos_advanced_analytics.ProductDetailTable"/></div>
                     <div class="col-12"><t t-call="pos_advanced_analytics.CategoryDetailTable"/></div>
                     <div class="col-12"><t t-call="pos_advanced_analytics.PaymentDetailTables"/></div>

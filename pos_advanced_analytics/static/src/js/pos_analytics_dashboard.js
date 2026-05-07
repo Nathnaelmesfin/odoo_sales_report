@@ -4,6 +4,8 @@ import { Component, onMounted, onWillUnmount, useState } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 
+const HEADLINE_KPI_KEYS = ["total_sales", "net_sales", "total_orders", "average_order_value", "total_tax", "cash_sales"];
+
 const KPI_DEFINITIONS = [
     ["total_sales", "Total Sales", "currency"], ["net_sales", "Net Sales", "currency"],
     ["total_orders", "Total Orders", "number"], ["average_order_value", "Average Order Value", "currency"],
@@ -63,6 +65,14 @@ export class PosAnalyticsDashboard extends Component {
             if (["dine_in_sales", "takeaway_sales"].includes(key) && !kpis.dine_takeaway_available) return false;
             return true;
         }).map(([key, label, type]) => ({ key, label, type, value: this.formatValue(kpis[key], type) }));
+    }
+
+    get headlineKpiCards() {
+        return this.kpiCards.filter((kpi) => HEADLINE_KPI_KEYS.includes(kpi.key));
+    }
+
+    get detailKpiCards() {
+        return this.kpiCards.filter((kpi) => !HEADLINE_KPI_KEYS.includes(kpi.key));
     }
 
     get hasData() {

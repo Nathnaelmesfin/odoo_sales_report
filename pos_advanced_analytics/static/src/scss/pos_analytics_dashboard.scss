@@ -138,3 +138,60 @@
         .o_donut_wrap { grid-template-columns: 1fr; }
     }
 }
+
+.o_pos_analytics_dashboard {
+    .o_pos_analytics_section_title {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 16px;
+        margin: 8px 0 12px;
+
+        h2 {
+            margin: 0;
+            color: #111827;
+            font-size: 20px;
+            font-weight: 800;
+        }
+
+        p {
+            margin: 4px 0 0;
+            color: #6b7280;
+            font-size: 13px;
+        }
+    }
+
+    .o_pos_analytics_headline_kpis {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .o_pos_analytics_headline_kpi {
+        .card-body {
+            padding: 14px 16px;
+        }
+
+        .o_pos_analytics_kpi_value {
+            font-size: 22px;
+        }
+    }
+
+    .o_pos_analytics_top_grid {
+        margin-bottom: 18px;
+    }
+
+    .o_pos_analytics_feature_panel .o_svg_line_chart {
+        height: 260px;
+    }
+
+    .o_pos_analytics_top_grid .o_pos_analytics_panel {
+        height: 100%;
+    }
+
+    .o_pos_analytics_top_grid .table-responsive {
+        max-height: 360px;
+        overflow: auto;
+    }
+}
