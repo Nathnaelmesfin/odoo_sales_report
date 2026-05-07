@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pos_analytics_res_config_settings" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.pos.analytics</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="point_of_sale.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="POS Analytics" string="POS Analytics" name="pos_advanced_analytics" groups="pos_advanced_analytics.group_pos_analytics_manager">
+                    <block title="Dashboard Defaults" name="pos_analytics_dashboard_defaults">
+                        <setting string="Default Dashboard Date Range" help="Initial period selected when managers open the live dashboard.">
+                            <field name="pos_analytics_default_date_range"/>
+                        </setting>
+                        <setting string="Auto-refresh Interval" help="Dashboard refresh interval in seconds. Use 30 or 60 seconds for live POS monitoring.">
+                            <field name="pos_analytics_auto_refresh_interval"/>
+                        </setting>
+                        <setting string="Default POS Branch" help="Optional default branch filter for the dashboard.">
+                            <field name="pos_analytics_default_pos_config_id"/>
+                        </setting>
+                        <setting string="Report Timezone" help="Business reporting timezone for POS timestamps.">
+                            <field name="pos_analytics_default_report_timezone"/>
+                        </setting>
+                    </block>
+                    <block title="Analytics Cards" name="pos_analytics_cards">
+                        <setting string="Target Cards" help="Show monthly target, achievement, remaining target, and required daily sales cards.">
+                            <field name="pos_analytics_enable_target_cards"/>
+                        </setting>
+                        <setting string="Waiter Analytics" help="Show waiter performance cards and tables when POS employee data is available.">
+                            <field name="pos_analytics_enable_waiter_analytics"/>
+                        </setting>
+                        <setting string="Cashier Analytics" help="Show cashier performance cards and tables.">
+                            <field name="pos_analytics_enable_cashier_analytics"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_pos_analytics_settings" model="ir.actions.act_window">
+        <field name="name">POS Analytics Settings</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">inline</field>
+        <field name="context">{'module': 'pos_advanced_analytics'}</field>
+    </record>
+</odoo>

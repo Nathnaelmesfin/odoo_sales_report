@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pos_analytics_target_tree" model="ir.ui.view">
+        <field name="name">pos.analytics.target.tree</field>
+        <field name="model">pos.analytics.target</field>
+        <field name="arch" type="xml">
+            <tree string="POS Analytics Targets" decoration-muted="not active">
+                <field name="name"/>
+                <field name="date_start"/>
+                <field name="date_end"/>
+                <field name="pos_config_id"/>
+                <field name="cashier_id"/>
+                <field name="waiter_id"/>
+                <field name="target_amount" sum="Total Sales Target"/>
+                <field name="target_orders" sum="Total Order Target"/>
+                <field name="target_avg_order_value"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="active"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_pos_analytics_target_form" model="ir.ui.view">
+        <field name="name">pos.analytics.target.form</field>
+        <field name="model">pos.analytics.target</field>
+        <field name="arch" type="xml">
+            <form string="POS Analytics Target">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Monthly Branch Sales Target"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="date_start"/>
+                            <field name="date_end"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="active"/>
+                        </group>
+                        <group>
+                            <field name="pos_config_id"/>
+                            <field name="cashier_id"/>
+                            <field name="waiter_id"/>
+                        </group>
+                    </group>
+                    <group string="Sales and Order Targets">
+                        <field name="currency_id" invisible="1"/>
+                        <field name="target_amount"/>
+                        <field name="target_orders"/>
+                        <field name="target_avg_order_value"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_pos_analytics_target_search" model="ir.ui.view">
+        <field name="name">pos.analytics.target.search</field>
+        <field name="model">pos.analytics.target</field>
+        <field name="arch" type="xml">
+            <search string="POS Analytics Targets">
+                <field name="name"/>
+                <field name="pos_config_id"/>
+                <field name="cashier_id"/>
+                <field name="waiter_id"/>
+                <filter name="active" string="Active" domain="[('active','=',True)]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_branch" string="POS Branch" context="{'group_by':'pos_config_id'}"/>
+                    <filter name="group_cashier" string="Cashier" context="{'group_by':'cashier_id'}"/>
+                    <filter name="group_waiter" string="Waiter" context="{'group_by':'waiter_id'}"/>
+                    <filter name="group_company" string="Company" context="{'group_by':'company_id'}" groups="base.group_multi_company"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_pos_analytics_target" model="ir.actions.act_window">
+        <field name="name">POS Sales Targets</field>
+        <field name="res_model">pos.analytics.target</field>
+        <field name="view_mode">tree,form</field>
+        <field name="context">{'search_default_active': 1}</field>
+    </record>
+</odoo>
