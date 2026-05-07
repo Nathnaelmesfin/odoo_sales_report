@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from odoo import api, fields, models, _
-from odoo.exceptions import ValidationError
+from odoo.exceptions import AccessError, ValidationError
 
 
 class PosAnalyticsTarget(models.Model):
@@ -21,6 +21,24 @@ class PosAnalyticsTarget(models.Model):
     active = fields.Boolean(default=True)
     company_id = fields.Many2one("res.company", required=True, default=lambda self: self.env.company)
     currency_id = fields.Many2one(related="company_id.currency_id", store=True, readonly=True)
+
+
+    def _check_manager_access(self):
+        if not self.env.user.has_group("pos_advanced_analytics.group_pos_analytics_manager"):
+            raise AccessError(_("Only POS Analytics Managers can manage sales targets."))
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        self._check_manager_access()
+        return super().create(vals_list)
+
+    def write(self, vals):
+        self._check_manager_access()
+        return super().write(vals)
+
+    def unlink(self):
+        self._check_manager_access()
+        return super().unlink()
 
     @api.constrains("date_start", "date_end", "target_amount", "target_orders", "target_avg_order_value")
     def _check_target_values(self):

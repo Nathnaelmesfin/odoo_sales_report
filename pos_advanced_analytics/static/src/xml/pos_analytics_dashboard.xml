@@ -53,13 +53,13 @@
                                 <option t-foreach="state.options.pos_configs || []" t-as="opt" t-key="opt.id" t-att-value="opt.id" t-att-selected="state.filters.pos_config_ids.includes(opt.id)" t-esc="opt.name"/>
                             </select>
                         </div>
-                        <div class="col-12 col-md-2">
+                        <div t-if="(state.options.defaults || {}).enable_cashier_analytics" class="col-12 col-md-2">
                             <label>Cashier</label>
                             <select class="form-select" name="cashier_ids" multiple="multiple" t-on-change="onFilterChange">
                                 <option t-foreach="state.options.cashiers || []" t-as="opt" t-key="opt.id" t-att-value="opt.id" t-att-selected="state.filters.cashier_ids.includes(opt.id)" t-esc="opt.name"/>
                             </select>
                         </div>
-                        <div class="col-12 col-md-2">
+                        <div t-if="(state.options.defaults || {}).enable_waiter_analytics" class="col-12 col-md-2">
                             <label>Waiter</label>
                             <select class="form-select" name="waiter_ids" multiple="multiple" t-on-change="onFilterChange">
                                 <option t-foreach="state.options.waiters || []" t-as="opt" t-key="opt.id" t-att-value="opt.id" t-att-selected="state.filters.waiter_ids.includes(opt.id)" t-esc="opt.name"/>
@@ -106,15 +106,16 @@
                         <div class="card o_pos_analytics_panel">
                             <div class="card-header">Sales Trend</div>
                             <div class="card-body">
-                                <div class="o_pos_analytics_bar" t-foreach="state.data.sales_trend || []" t-as="row" t-key="row.label">
-                                    <span class="o_label" t-esc="row.label"/>
-                                    <span class="o_bar"><span t-att-style="'width:' + barWidth(row.total_sales, state.data.sales_trend, 'total_sales')"/></span>
-                                    <span class="o_value" t-esc="formatValue(row.total_sales, 'currency')"/>
-                                </div>
+                                <t t-if="!(state.data.sales_trend || []).length"><div class="text-muted">No trend data.</div></t>
+                                <svg t-if="(state.data.sales_trend || []).length" class="o_svg_line_chart" viewBox="0 0 320 110" preserveAspectRatio="none">
+                                    <defs><linearGradient id="paaTrend" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#2563eb" stop-opacity=".35"/><stop offset="100%" stop-color="#2563eb" stop-opacity="0"/></linearGradient></defs>
+                                    <polyline t-att-points="linePoints(state.data.sales_trend, 'total_sales')" fill="none" stroke="#2563eb" stroke-width="3"/>
+                                </svg>
+                                <div class="o_chart_labels"><span t-foreach="state.data.sales_trend || []" t-as="row" t-key="row.label"><t t-esc="row.label"/>: <strong t-esc="formatValue(row.total_sales, 'currency')"/></span></div>
                             </div>
                         </div>
                     </div>
-                    <div class="col-12 col-xl-4">
+                    <div t-if="(state.data.settings || {}).enable_target_cards" class="col-12 col-xl-4">
                         <div class="card o_pos_analytics_panel">
                             <div class="card-header">Target Summary</div>
                             <div class="card-body">
@@ -132,32 +133,60 @@
                 </div>
 
                 <div class="row g-3 mt-1">
-                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.BarPanel"><t t-set="title" t-value="'Sales by Hour'"/><t t-set="rows" t-value="state.data.peak_hours || []"/><t t-set="labelKey" t-value="'label'"/><t t-set="valueKey" t-value="'sales_amount'"/></t></div>
-                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.BarPanel"><t t-set="title" t-value="'Sales by Day'"/><t t-set="rows" t-value="state.data.peak_days || []"/><t t-set="labelKey" t-value="'label'"/><t t-set="valueKey" t-value="'sales_amount'"/></t></div>
-                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.BarPanel"><t t-set="title" t-value="'Top Products'"/><t t-set="rows" t-value="state.data.top_products || []"/><t t-set="labelKey" t-value="'product_name'"/><t t-set="valueKey" t-value="'gross_sales'"/></t></div>
-                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.BarPanel"><t t-set="title" t-value="'Top Categories'"/><t t-set="rows" t-value="state.data.top_categories || []"/><t t-set="labelKey" t-value="'category_name'"/><t t-set="valueKey" t-value="'gross_sales'"/></t></div>
-                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.BarPanel"><t t-set="title" t-value="'Payment Method Breakdown'"/><t t-set="rows" t-value="state.data.payment_methods || []"/><t t-set="labelKey" t-value="'payment_method_name'"/><t t-set="valueKey" t-value="'amount'"/></t></div>
-                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.BarPanel"><t t-set="title" t-value="'Branch Comparison'"/><t t-set="rows" t-value="state.data.branch_comparison || []"/><t t-set="labelKey" t-value="'branch_name'"/><t t-set="valueKey" t-value="'total_sales'"/></t></div>
+                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.SvgBarChart"><t t-set="title" t-value="'Sales by Hour'"/><t t-set="rows" t-value="state.data.peak_hours || []"/><t t-set="labelKey" t-value="'label'"/><t t-set="valueKey" t-value="'sales_amount'"/></t></div>
+                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.SvgBarChart"><t t-set="title" t-value="'Sales by Day'"/><t t-set="rows" t-value="state.data.peak_days || []"/><t t-set="labelKey" t-value="'label'"/><t t-set="valueKey" t-value="'sales_amount'"/></t></div>
+                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.SvgBarChart"><t t-set="title" t-value="'Top Products'"/><t t-set="rows" t-value="state.data.top_products || []"/><t t-set="labelKey" t-value="'product_name'"/><t t-set="valueKey" t-value="'gross_sales'"/></t></div>
+                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.SvgBarChart"><t t-set="title" t-value="'Top Categories'"/><t t-set="rows" t-value="state.data.top_categories || []"/><t t-set="labelKey" t-value="'category_name'"/><t t-set="valueKey" t-value="'gross_sales'"/></t></div>
+                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.DonutChart"><t t-set="title" t-value="'Payment Method Breakdown'"/><t t-set="rows" t-value="state.data.payment_methods || []"/><t t-set="labelKey" t-value="'payment_method_name'"/><t t-set="valueKey" t-value="'amount'"/></t></div>
+                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.SvgBarChart"><t t-set="title" t-value="'Branch Comparison'"/><t t-set="rows" t-value="state.data.branch_comparison || []"/><t t-set="labelKey" t-value="'branch_name'"/><t t-set="valueKey" t-value="'total_sales'"/></t></div>
+                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.DonutChart"><t t-set="title" t-value="'Category Share'"/><t t-set="rows" t-value="state.data.top_categories || []"/><t t-set="labelKey" t-value="'category_name'"/><t t-set="valueKey" t-value="'gross_sales'"/></t></div>
+                    <div class="col-12 col-lg-6"><t t-call="pos_advanced_analytics.HeatmapChart"/></div>
                 </div>
 
                 <div class="row g-3 mt-1">
-                    <div class="col-12"><t t-call="pos_advanced_analytics.WaiterTable"/></div>
-                    <div class="col-12"><t t-call="pos_advanced_analytics.CashierTable"/></div>
+                    <div t-if="(state.data.settings || {}).enable_waiter_analytics" class="col-12"><t t-call="pos_advanced_analytics.WaiterTable"/></div>
+                    <div t-if="(state.data.settings || {}).enable_cashier_analytics" class="col-12"><t t-call="pos_advanced_analytics.CashierTable"/></div>
                     <div class="col-12"><t t-call="pos_advanced_analytics.RefundDiscount"/></div>
                 </div>
             </t>
         </div>
     </t>
 
-    <t t-name="pos_advanced_analytics.BarPanel">
+    <t t-name="pos_advanced_analytics.SvgBarChart">
         <div class="card o_pos_analytics_panel">
             <div class="card-header" t-esc="title"/>
             <div class="card-body">
                 <div t-if="!rows.length" class="text-muted">No data.</div>
-                <div class="o_pos_analytics_bar" t-foreach="rows" t-as="row" t-key="row[labelKey]">
-                    <span class="o_label" t-esc="row[labelKey]"/>
-                    <span class="o_bar"><span t-att-style="'width:' + barWidth(row[valueKey], rows, valueKey)"/></span>
-                    <span class="o_value" t-esc="formatValue(row[valueKey], 'currency')"/>
+                <div class="o_svg_bar_row" t-foreach="chartRows(rows, labelKey, valueKey)" t-as="row" t-key="row.index">
+                    <span class="o_svg_label" t-esc="row.label"/>
+                    <svg viewBox="0 0 100 12" preserveAspectRatio="none"><rect x="0" y="1" width="100" height="10" rx="5" fill="#e5e7eb"/><rect x="0" y="1" t-att-width="row.width" height="10" rx="5" fill="#2563eb"><title><t t-esc="row.label"/>: <t t-esc="formatValue(row.value, 'currency')"/></title></rect></svg>
+                    <span class="o_svg_value" t-esc="formatValue(row.value, 'currency')"/>
+                </div>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="pos_advanced_analytics.DonutChart">
+        <div class="card o_pos_analytics_panel">
+            <div class="card-header" t-esc="title"/>
+            <div class="card-body o_donut_wrap">
+                <div t-if="!rows.length" class="text-muted">No data.</div>
+                <svg t-if="rows.length" class="o_donut_chart" viewBox="0 0 42 42">
+                    <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="#e5e7eb" stroke-width="6"/>
+                    <circle t-foreach="donutSegments(rows, valueKey)" t-as="seg" t-key="seg.index" cx="21" cy="21" r="15.915" fill="transparent" t-att-stroke="seg.color" stroke-width="6" t-att-stroke-dasharray="seg.length + ' ' + (100 - seg.length)" t-att-stroke-dashoffset="seg.offset"><title><t t-esc="seg.row[labelKey]"/>: <t t-esc="formatValue(seg.row[valueKey], 'currency')"/></title></circle>
+                </svg>
+                <div class="o_donut_legend"><div t-foreach="chartRows(rows, labelKey, valueKey, 8)" t-as="row" t-key="row.index"><span t-esc="row.label"/> <strong t-esc="formatValue(row.value, 'currency')"/></div></div>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="pos_advanced_analytics.HeatmapChart">
+        <div class="card o_pos_analytics_panel">
+            <div class="card-header">Peak Hours by Day Heatmap</div>
+            <div class="card-body o_heatmap_grid">
+                <div t-if="!(state.data.peak_hour_day_heatmap || []).length" class="text-muted">No heatmap data.</div>
+                <div t-foreach="heatmapRows(state.data.peak_hour_day_heatmap || [])" t-as="row" t-key="row.label" class="o_heatmap_cell" t-att-style="'background: rgba(37, 99, 235,' + row.opacity + ')'">
+                    <span t-esc="row.label"/><strong t-esc="formatValue(row.sales_amount, 'currency')"/>
                 </div>
             </div>
         </div>

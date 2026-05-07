@@ -56,7 +56,13 @@ export class PosAnalyticsDashboard extends Component {
 
     get kpiCards() {
         const kpis = this.state.data.kpis || {};
-        return KPI_DEFINITIONS.map(([key, label, type]) => ({ key, label, type, value: this.formatValue(kpis[key], type) }));
+        const settings = this.state.data.settings || this.state.options.defaults || {};
+        return KPI_DEFINITIONS.filter(([key]) => {
+            if (["top_waiter", "sales_per_waiter"].includes(key) && !settings.enable_waiter_analytics) return false;
+            if (["top_cashier", "sales_per_cashier"].includes(key) && !settings.enable_cashier_analytics) return false;
+            if (["dine_in_sales", "takeaway_sales"].includes(key) && !kpis.dine_takeaway_available) return false;
+            return true;
+        }).map(([key, label, type]) => ({ key, label, type, value: this.formatValue(kpis[key], type) }));
     }
 
     get hasData() {
@@ -194,6 +200,39 @@ export class PosAnalyticsDashboard extends Component {
     barWidth(value, rows, key) {
         const max = Math.max(...(rows || []).map((row) => Number(row[key] || 0)), 0);
         return max ? `${Math.max((Number(value || 0) / max) * 100, 3)}%` : "0%";
+    }
+
+    chartRows(rows, labelKey, valueKey, limit = 12) {
+        const values = (rows || []).slice(0, limit).map((row) => ({ label: row[labelKey] || row.label || "—", value: Number(row[valueKey] || 0) }));
+        const max = Math.max(...values.map((row) => row.value), 0);
+        return values.map((row, index) => ({ ...row, index, width: max ? Math.max(row.value / max * 100, 2) : 0 }));
+    }
+
+    linePoints(rows, valueKey = "total_sales") {
+        const values = (rows || []).map((row) => Number(row[valueKey] || 0));
+        if (!values.length) return "";
+        const max = Math.max(...values, 1);
+        const step = values.length > 1 ? 300 / (values.length - 1) : 300;
+        return values.map((value, index) => `${index * step},${90 - (value / max) * 80}`).join(" ");
+    }
+
+    donutSegments(rows, valueKey = "amount") {
+        const values = (rows || []).map((row) => Number(row[valueKey] || 0));
+        const total = values.reduce((sum, value) => sum + value, 0);
+        let offset = 25;
+        return (rows || []).slice(0, 6).map((row, index) => {
+            const value = Number(row[valueKey] || 0);
+            const length = total ? value / total * 100 : 0;
+            const segment = { row, index, length, offset, color: ["#2563eb", "#14b8a6", "#f59e0b", "#ef4444", "#8b5cf6", "#64748b"][index % 6] };
+            offset -= length;
+            return segment;
+        });
+    }
+
+    heatmapRows(rows) {
+        const values = rows || [];
+        const max = Math.max(...values.map((row) => Number(row.sales_amount || 0)), 0);
+        return values.map((row) => ({ ...row, opacity: max ? 0.15 + (Number(row.sales_amount || 0) / max) * 0.85 : 0.15 }));
     }
 }
 

@@ -8,7 +8,7 @@ import json
 import pytz
 
 from odoo import api, fields, models, _
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 from odoo.tools import DEFAULT_SERVER_DATE_FORMAT, DEFAULT_SERVER_DATETIME_FORMAT
 
 
@@ -22,28 +22,44 @@ class PosAnalyticsService(models.AbstractModel):
 
     @api.model
     def get_dashboard_data(self, filters=None):
+        self._check_analytics_access()
         filters = self._normalize_filters(filters or {})
-        return {
+        settings = self._get_settings()
+        kpis = self._get_kpis(filters, settings=settings)
+        dine_takeaway = self._get_dine_takeaway_sales(filters)
+        data = {
             "filters": filters,
-            "kpis": self._get_kpis(filters),
+            "settings": settings,
+            "basis_label": self._basis_label(filters),
+            "kpis": kpis,
             "sales_trend": self._get_sales_trend(filters),
             "top_products": self._get_top_products(filters),
             "top_categories": self._get_top_categories(filters),
-            "waiter_performance": self._get_waiter_performance(filters),
-            "cashier_performance": self._get_cashier_performance(filters),
+            "waiter_performance": self._get_waiter_performance(filters) if settings["enable_waiter_analytics"] else [],
+            "cashier_performance": self._get_cashier_performance(filters) if settings["enable_cashier_analytics"] else [],
             "peak_hours": self._get_peak_hours(filters),
             "peak_days": self._get_peak_days(filters),
+            "peak_hour_day_heatmap": self._get_peak_hour_day_heatmap(filters),
             "payment_methods": self._get_payment_methods(filters),
             "branch_comparison": self._get_branch_comparison(filters),
             "refund_discount_summary": self._get_refund_discount_summary(filters),
             "tax_summary": self._get_tax_summary(filters),
+            "grouped_report": self.get_grouped_report_data(filters),
             "raw_orders": self._get_raw_orders(filters) if filters.get("include_raw_orders") else [],
-            "target_summary": self._get_target_summary(filters),
+            "target_summary": self._get_target_summary(filters) if settings["enable_target_cards"] else {},
             "daily_closing": self._get_daily_closing(filters),
+            "dine_takeaway": dine_takeaway,
         }
+        return data
+
+    @api.model
+    def get_dashboard_bootstrap_data(self):
+        self._check_analytics_access()
+        return self.get_filter_options()
 
     @api.model
     def get_filter_options(self):
+        self._check_analytics_access()
         company_ids = self.env.companies.ids
         configs = self.env["pos.config"].search([("company_id", "in", company_ids)], order="name")
         cashiers = self.env["res.users"].search([], order="name")
@@ -78,6 +94,33 @@ class PosAnalyticsService(models.AbstractModel):
                 "timezone": ICP.get_param("pos_advanced_analytics.default_report_timezone", DEFAULT_TZ) or DEFAULT_TZ,
             },
         }
+
+
+    def _check_analytics_access(self, manager=False):
+        group = "pos_advanced_analytics.group_pos_analytics_manager" if manager else "pos_advanced_analytics.group_pos_analytics_user"
+        if not self.env.user.has_group(group):
+            raise AccessError(_("You do not have access to POS analytics."))
+
+    def _get_settings(self):
+        ICP = self.env["ir.config_parameter"].sudo()
+        interval = int(ICP.get_param("pos_advanced_analytics.auto_refresh_interval", "60") or 60)
+        return {
+            "date_range": ICP.get_param("pos_advanced_analytics.default_date_range", "today") or "today",
+            "auto_refresh_interval": max(interval, 30),
+            "default_pos_config_id": int(ICP.get_param("pos_advanced_analytics.default_pos_config_id", "0") or 0),
+            "enable_target_cards": ICP.get_param("pos_advanced_analytics.enable_target_cards", "True") == "True",
+            "enable_waiter_analytics": ICP.get_param("pos_advanced_analytics.enable_waiter_analytics", "True") == "True",
+            "enable_cashier_analytics": ICP.get_param("pos_advanced_analytics.enable_cashier_analytics", "True") == "True",
+            "timezone": ICP.get_param("pos_advanced_analytics.default_report_timezone", DEFAULT_TZ) or DEFAULT_TZ,
+        }
+
+    def _basis_label(self, filters):
+        return dict([
+            ("incl", _("Sales Including Tax")),
+            ("excl", _("Sales Excluding Tax")),
+            ("qty", _("Quantity Sold")),
+            ("net", _("Net Sales After Refunds")),
+        ]).get(filters.get("report_basis"), _("Sales Including Tax"))
 
     def _name_get_payload(self, records):
         return [{"id": rec.id, "name": rec.display_name} for rec in records]
@@ -213,6 +256,45 @@ class PosAnalyticsService(models.AbstractModel):
             return f"{prefix}qty"
         return f"{prefix}price_subtotal_incl"
 
+    def _get_basis_order_metric(self, filters):
+        where, params = self._order_where(filters, alias="po")
+        basis = filters.get("report_basis")
+        if basis == "qty":
+            line_where, line_params = self._line_where(filters)
+            row = self._fetchone_dict(f"""
+                SELECT COALESCE(SUM(pol.qty), 0) AS value
+                FROM pos_order_line pol
+                JOIN pos_order po ON po.id = pol.order_id
+                JOIN product_product pp ON pp.id = pol.product_id
+                JOIN product_template pt ON pt.id = pp.product_tmpl_id
+                WHERE {line_where}
+            """, line_params)
+            return float(row.get("value") or 0.0)
+        if basis == "excl":
+            expr = "po.amount_total - po.amount_tax"
+        elif basis == "net":
+            expr = "po.amount_total"
+        else:
+            expr = "po.amount_total"
+        row = self._fetchone_dict(f"SELECT COALESCE(SUM({expr}), 0) AS value FROM pos_order po WHERE {where}", params)
+        return float(row.get("value") or 0.0)
+
+    def _order_basis_expr(self, filters, alias="po"):
+        basis = filters.get("report_basis")
+        if basis == "excl":
+            return f"({alias}.amount_total - {alias}.amount_tax)"
+        if basis == "net":
+            return f"{alias}.amount_total"
+        return f"{alias}.amount_total"
+
+    def _line_basis_expr(self, filters, alias="pol"):
+        basis = filters.get("report_basis")
+        if basis == "excl":
+            return f"{alias}.price_subtotal"
+        if basis == "qty":
+            return f"{alias}.qty"
+        return f"{alias}.price_subtotal_incl"
+
     def _fetchall_dict(self, query, params):
         self.env.cr.execute(query, params)
         return [dict(row) for row in self.env.cr.dictfetchall()]
@@ -221,7 +303,8 @@ class PosAnalyticsService(models.AbstractModel):
         self.env.cr.execute(query, params)
         return dict(self.env.cr.dictfetchone() or {})
 
-    def _get_kpis(self, filters):
+    def _get_kpis(self, filters, settings=None):
+        settings = settings or self._get_settings()
         where, params = self._order_where(filters, alias="po")
         order_row = self._fetchone_dict(f"""
             SELECT
@@ -250,15 +333,18 @@ class PosAnalyticsService(models.AbstractModel):
         mobile_sales = sum(r["amount"] for r in payment_rows if r["method_type"] == "mobile")
         best_product = (self._get_top_products(filters, limit=1) or [{}])[0]
         best_category = (self._get_top_categories(filters, limit=1) or [{}])[0]
-        top_waiter = (self._get_waiter_performance(filters, limit=1) or [{}])[0]
-        top_cashier = (self._get_cashier_performance(filters, limit=1) or [{}])[0]
+        top_waiter = (self._get_waiter_performance(filters, limit=1) or [{}])[0] if settings["enable_waiter_analytics"] else {}
+        top_cashier = (self._get_cashier_performance(filters, limit=1) or [{}])[0] if settings["enable_cashier_analytics"] else {}
         peak_hour = (self._get_peak_hours(filters, limit=1) or [{}])[0]
         peak_day = (self._get_peak_days(filters, limit=1) or [{}])[0]
         branch_rows = self._get_branch_comparison(filters)
         dine_takeaway = self._get_dine_takeaway_sales(filters)
         total_orders = order_row.get("total_orders") or 0
-        total_sales = float(order_row.get("total_sales") or 0.0)
+        basis_metric = self._get_basis_order_metric(filters)
+        total_sales = basis_metric
         return {
+            "basis_label": self._basis_label(filters),
+            "basis_metric": basis_metric,
             "total_sales": total_sales,
             "net_sales": float(order_row.get("net_sales") or 0.0),
             "total_orders": total_orders,
@@ -276,12 +362,13 @@ class PosAnalyticsService(models.AbstractModel):
             "top_cashier": top_cashier.get("cashier_name") or _("No cashier"),
             "peak_sales_hour": peak_hour.get("label") or _("No data"),
             "peak_sales_day": peak_day.get("label") or _("No data"),
-            "dine_in_sales": dine_takeaway["dine_in_sales"],
-            "takeaway_sales": dine_takeaway["takeaway_sales"],
+            "dine_takeaway_available": dine_takeaway.get("available", False),
+            "dine_in_sales": dine_takeaway.get("dine_in_sales", 0.0),
+            "takeaway_sales": dine_takeaway.get("takeaway_sales", 0.0),
             "branch_sales_comparison_summary": self._branch_summary_text(branch_rows),
             "sales_per_hour": sum(r.get("sales_amount", 0.0) for r in self._get_peak_hours(filters)) / 24.0,
-            "sales_per_waiter": self._average_metric(self._get_waiter_performance(filters), "total_sales"),
-            "sales_per_cashier": self._average_metric(self._get_cashier_performance(filters), "total_collected"),
+            "sales_per_waiter": self._average_metric(self._get_waiter_performance(filters), "total_sales") if settings["enable_waiter_analytics"] else 0.0,
+            "sales_per_cashier": self._average_metric(self._get_cashier_performance(filters), "total_collected") if settings["enable_cashier_analytics"] else 0.0,
         }
 
     def _average_metric(self, rows, key):
@@ -294,12 +381,14 @@ class PosAnalyticsService(models.AbstractModel):
         return _("%s leads with %s sales across %s branch(es)") % (top.get("branch_name"), round(top.get("total_sales", 0.0), 2), len(rows))
 
     def _get_sales_trend(self, filters):
-        group = filters.get("group_by") or "day"
+        group = filters.get("group_by") if filters.get("group_by") in ("day", "week", "month", "year") else "day"
         date_expr = self._trend_date_expr(group, filters["timezone"])
         where, params = self._order_where(filters, alias="po")
+        metric_expr = self._order_basis_expr(filters, "po")
         rows = self._fetchall_dict(f"""
             SELECT {date_expr} AS period_key,
-                   COALESCE(SUM(CASE WHEN po.amount_total >= 0 THEN po.amount_total ELSE 0 END), 0) AS total_sales,
+                   COALESCE(SUM(CASE WHEN po.amount_total >= 0 THEN {metric_expr} ELSE 0 END), 0) AS total_sales,
+                   COALESCE(SUM({metric_expr}), 0) AS basis_amount,
                    COALESCE(SUM(po.amount_total), 0) AS net_sales,
                    COUNT(po.id) AS order_count,
                    COALESCE(SUM(po.amount_tax), 0) AS tax_amount
@@ -322,6 +411,7 @@ class PosAnalyticsService(models.AbstractModel):
 
     def _get_top_products(self, filters, limit=20):
         where, params = self._line_where(filters)
+        basis_expr = self._line_basis_expr(filters, "pol")
         rows = self._fetchall_dict(f"""
             SELECT pol.product_id,
                    COALESCE(pt.name->>%s, pt.name->>'en_US', pp.default_code, 'Product') AS product_name,
@@ -329,9 +419,11 @@ class PosAnalyticsService(models.AbstractModel):
                    COALESCE(SUM(pol.qty), 0) AS quantity_sold,
                    COALESCE(SUM(CASE WHEN pol.qty >= 0 THEN pol.price_subtotal_incl ELSE 0 END), 0) AS gross_sales,
                    COALESCE(SUM(pol.price_subtotal_incl), 0) AS net_sales,
+                   COALESCE(SUM({basis_expr}), 0) AS basis_amount,
                    COALESCE(SUM(CASE WHEN pol.qty < 0 THEN ABS(pol.qty) ELSE 0 END), 0) AS refund_quantity,
                    COALESCE(SUM(CASE WHEN pol.price_subtotal_incl < 0 THEN ABS(pol.price_subtotal_incl) ELSE 0 END), 0) AS refund_amount,
-                   COALESCE(SUM(ABS(pol.qty) * pol.price_unit * pol.discount / 100.0), 0) AS discount_amount
+                   COALESCE(SUM(ABS(pol.qty) * pol.price_unit * pol.discount / 100.0), 0) AS discount_amount,
+                   CASE WHEN SUM(ABS(pol.qty)) <> 0 THEN COALESCE(SUM(pol.price_subtotal_incl), 0) / SUM(ABS(pol.qty)) ELSE 0 END AS average_unit_price
             FROM pos_order_line pol
             JOIN pos_order po ON po.id = pol.order_id
             JOIN product_product pp ON pp.id = pol.product_id
@@ -346,15 +438,18 @@ class PosAnalyticsService(models.AbstractModel):
 
     def _get_top_categories(self, filters, limit=20):
         where, params = self._line_where(filters)
+        basis_expr = self._line_basis_expr(filters, "pol")
         rows = self._fetchall_dict(f"""
             SELECT pt.categ_id AS category_id,
                    COALESCE(pc.complete_name, pc.name, 'No Category') AS category_name,
                    COALESCE(SUM(pol.qty), 0) AS quantity_sold,
                    COALESCE(SUM(CASE WHEN pol.qty >= 0 THEN pol.price_subtotal_incl ELSE 0 END), 0) AS gross_sales,
                    COALESCE(SUM(pol.price_subtotal_incl), 0) AS net_sales,
+                   COALESCE(SUM({basis_expr}), 0) AS basis_amount,
                    COALESCE(SUM(CASE WHEN pol.qty < 0 THEN ABS(pol.qty) ELSE 0 END), 0) AS refund_quantity,
                    COALESCE(SUM(CASE WHEN pol.price_subtotal_incl < 0 THEN ABS(pol.price_subtotal_incl) ELSE 0 END), 0) AS refund_amount,
-                   COALESCE(SUM(ABS(pol.qty) * pol.price_unit * pol.discount / 100.0), 0) AS discount_amount
+                   COALESCE(SUM(ABS(pol.qty) * pol.price_unit * pol.discount / 100.0), 0) AS discount_amount,
+                   COUNT(DISTINCT pol.product_id) AS product_count
             FROM pos_order_line pol
             JOIN pos_order po ON po.id = pol.order_id
             JOIN product_product pp ON pp.id = pol.product_id
@@ -493,7 +588,11 @@ class PosAnalyticsService(models.AbstractModel):
         return "other"
 
     def _get_payment_methods(self, filters):
-        return self._payment_group_rows(filters)
+        rows = self._payment_group_rows(filters)
+        total = sum(row.get("amount", 0.0) for row in rows) or 0.0
+        for row in rows:
+            row["percentage"] = row.get("amount", 0.0) / total * 100.0 if total else 0.0
+        return rows
 
     def _cashier_payment_breakdown(self, filters):
         where, params = self._order_where(filters, alias="po")
@@ -542,6 +641,7 @@ class PosAnalyticsService(models.AbstractModel):
         row = self._fetchone_dict(f"""
             SELECT COALESCE(SUM(CASE WHEN pol.price_subtotal_incl < 0 THEN ABS(pol.price_subtotal_incl) ELSE 0 END), 0) AS total_refund_amount,
                    COUNT(DISTINCT CASE WHEN pol.price_subtotal_incl < 0 OR po.amount_total < 0 THEN po.id END) AS refund_order_count,
+                   COALESCE(SUM(CASE WHEN pol.qty < 0 THEN ABS(pol.qty) ELSE 0 END), 0) AS refund_quantity,
                    COALESCE(SUM(ABS(pol.qty) * pol.price_unit * pol.discount / 100.0), 0) AS discount_amount,
                    COUNT(DISTINCT CASE WHEN pol.discount > 0 THEN po.id END) AS discounted_order_count
             FROM pos_order_line pol
@@ -550,10 +650,54 @@ class PosAnalyticsService(models.AbstractModel):
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             WHERE {where}
         """, params)
-        row["discount_by_cashier"] = self._discount_by(filters, "cashier")
-        row["discount_by_product"] = self._discount_by(filters, "product")
-        row["discount_by_category"] = self._discount_by(filters, "category")
+        for group in ("cashier", "waiter", "product", "category", "branch", "date"):
+            row["discount_by_%s" % group] = self._discount_by(filters, group)
+            row["refund_by_%s" % group] = self._refund_by(filters, group)
         return row
+
+    def _refund_by(self, filters, group):
+        where, params = self._line_where(filters)
+        joins = ""
+        extra_params = []
+        if group == "cashier":
+            select = "po.user_id AS id, COALESCE(rp.name, ru.login, 'No Cashier') AS name"
+            joins = "LEFT JOIN res_users ru ON ru.id = po.user_id LEFT JOIN res_partner rp ON rp.id = ru.partner_id"
+            groupby = "po.user_id, name"
+        elif group == "waiter":
+            select = "po.employee_id AS id, COALESCE(he.name, 'No Waiter') AS name"
+            joins = "LEFT JOIN hr_employee he ON he.id = po.employee_id"
+            groupby = "po.employee_id, name"
+        elif group == "category":
+            select = "pt.categ_id AS id, COALESCE(pc.complete_name, pc.name, 'No Category') AS name"
+            joins = "LEFT JOIN product_category pc ON pc.id = pt.categ_id"
+            groupby = "pt.categ_id, name"
+        elif group == "branch":
+            select = "po.config_id AS id, COALESCE(pconf.name, 'No Branch') AS name"
+            joins = "LEFT JOIN pos_config pconf ON pconf.id = po.config_id"
+            groupby = "po.config_id, name"
+        elif group == "date":
+            select = "0 AS id, TO_CHAR((po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %s)::date, 'YYYY-MM-DD') AS name"
+            extra_params = [filters["timezone"]]
+            groupby = "name"
+        else:
+            select = "pol.product_id AS id, COALESCE(pt.name->>%s, pt.name->>'en_US', 'Product') AS name"
+            extra_params = [self.env.lang or "en_US"]
+            groupby = "pol.product_id, name"
+        return self._fetchall_dict(f"""
+            SELECT {select},
+                   COALESCE(SUM(CASE WHEN pol.price_subtotal_incl < 0 THEN ABS(pol.price_subtotal_incl) ELSE 0 END), 0) AS refund_amount,
+                   COALESCE(SUM(CASE WHEN pol.qty < 0 THEN ABS(pol.qty) ELSE 0 END), 0) AS refund_quantity,
+                   COUNT(DISTINCT po.id) AS order_count
+            FROM pos_order_line pol
+            JOIN pos_order po ON po.id = pol.order_id
+            JOIN product_product pp ON pp.id = pol.product_id
+            JOIN product_template pt ON pt.id = pp.product_tmpl_id
+            {joins}
+            WHERE {where} AND (pol.price_subtotal_incl < 0 OR pol.qty < 0 OR po.amount_total < 0)
+            GROUP BY {groupby}
+            ORDER BY refund_amount DESC
+            LIMIT 50
+        """, extra_params + params)
 
     def _discount_by(self, filters, group):
         where, params = self._line_where(filters)
@@ -561,10 +705,23 @@ class PosAnalyticsService(models.AbstractModel):
             select = "po.user_id AS id, COALESCE(rp.name, ru.login, 'No Cashier') AS name"
             joins = "LEFT JOIN res_users ru ON ru.id = po.user_id LEFT JOIN res_partner rp ON rp.id = ru.partner_id"
             groupby = "po.user_id, name"
+        elif group == "waiter":
+            select = "po.employee_id AS id, COALESCE(he.name, 'No Waiter') AS name"
+            joins = "LEFT JOIN hr_employee he ON he.id = po.employee_id"
+            groupby = "po.employee_id, name"
         elif group == "category":
             select = "pt.categ_id AS id, COALESCE(pc.complete_name, pc.name, 'No Category') AS name"
             joins = "LEFT JOIN product_category pc ON pc.id = pt.categ_id"
             groupby = "pt.categ_id, name"
+        elif group == "branch":
+            select = "po.config_id AS id, COALESCE(pconf.name, 'No Branch') AS name"
+            joins = "LEFT JOIN pos_config pconf ON pconf.id = po.config_id"
+            groupby = "po.config_id, name"
+        elif group == "date":
+            select = "0 AS id, TO_CHAR((po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %s)::date, 'YYYY-MM-DD') AS name"
+            joins = ""
+            groupby = "name"
+            params = [filters["timezone"]] + params
         else:
             select = "pol.product_id AS id, COALESCE(pt.name->>%s, pt.name->>'en_US', 'Product') AS name"
             joins = ""
@@ -597,17 +754,28 @@ class PosAnalyticsService(models.AbstractModel):
         """, params)
 
     def _get_dine_takeaway_sales(self, filters):
-        # Odoo restaurant deployments differ in how they encode takeaway. Keep this robust and non-invasive.
         where, params = self._order_where(filters, alias="po")
         columns = self._table_columns("pos_order")
         if "takeaway" in columns:
             row = self._fetchone_dict(f"""
                 SELECT COALESCE(SUM(CASE WHEN po.takeaway THEN po.amount_total ELSE 0 END), 0) AS takeaway_sales,
-                       COALESCE(SUM(CASE WHEN NOT po.takeaway THEN po.amount_total ELSE 0 END), 0) AS dine_in_sales
+                       COALESCE(SUM(CASE WHEN NOT po.takeaway THEN po.amount_total ELSE 0 END), 0) AS dine_in_sales,
+                       COUNT(po.id) AS order_count
                 FROM pos_order po WHERE {where}
             """, params)
-            return {"dine_in_sales": row.get("dine_in_sales", 0.0), "takeaway_sales": row.get("takeaway_sales", 0.0)}
-        return {"dine_in_sales": 0.0, "takeaway_sales": 0.0}
+            row.update({"available": True, "source": "takeaway"})
+            return row
+        restaurant_markers = [field for field in ("table_id", "floor_id") if field in columns]
+        if "table_id" in columns:
+            row = self._fetchone_dict(f"""
+                SELECT COALESCE(SUM(CASE WHEN po.table_id IS NOT NULL THEN po.amount_total ELSE 0 END), 0) AS dine_in_sales,
+                       COALESCE(SUM(CASE WHEN po.table_id IS NULL THEN po.amount_total ELSE 0 END), 0) AS takeaway_sales,
+                       COUNT(po.id) AS order_count
+                FROM pos_order po WHERE {where}
+            """, params)
+            row.update({"available": True, "source": "table_id_inference"})
+            return row
+        return {"available": False, "source": "unavailable", "dine_in_sales": 0.0, "takeaway_sales": 0.0, "order_count": 0}
 
     def _table_columns(self, table):
         self.env.cr.execute("SELECT column_name FROM information_schema.columns WHERE table_name = %s", [table])
@@ -660,9 +828,13 @@ class PosAnalyticsService(models.AbstractModel):
 
     def _get_daily_closing(self, filters):
         where, params = self._order_where(filters, alias="po")
+        session_columns = self._table_columns("pos_session")
+        opening_expr = "ps.cash_register_balance_start" if "cash_register_balance_start" in session_columns else "0.0"
+        closing_expr = "ps.cash_register_balance_end_real" if "cash_register_balance_end_real" in session_columns else ("ps.cash_register_balance_end" if "cash_register_balance_end" in session_columns else "0.0")
         rows = self._fetchall_dict(f"""
             SELECT (po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %s)::date AS business_date,
                    pc.name AS branch_name, ps.name AS session_name, ps.start_at AS opening_time, ps.stop_at AS closing_time,
+                   COALESCE({opening_expr}, 0.0) AS opening_balance, COALESCE({closing_expr}, 0.0) AS closing_balance,
                    COALESCE(rp.name, ru.login, 'No Cashier') AS cashier_name,
                    COALESCE(SUM(CASE WHEN po.amount_total >= 0 THEN po.amount_total ELSE 0 END), 0) AS total_sales,
                    COALESCE(SUM(po.amount_total), 0) AS net_sales,
@@ -675,7 +847,7 @@ class PosAnalyticsService(models.AbstractModel):
             LEFT JOIN res_users ru ON ru.id = po.user_id
             LEFT JOIN res_partner rp ON rp.id = ru.partner_id
             WHERE {where}
-            GROUP BY business_date, pc.name, ps.name, ps.start_at, ps.stop_at, cashier_name
+            GROUP BY business_date, pc.name, ps.name, ps.start_at, ps.stop_at, opening_balance, closing_balance, cashier_name
             ORDER BY business_date, branch_name, session_name, cashier_name
         """, [filters["timezone"]] + params)
         payments = self._daily_closing_payments(filters)
@@ -688,6 +860,7 @@ class PosAnalyticsService(models.AbstractModel):
             row["bank_card_sales"] = payment.get("bank", 0.0)
             row["mobile_money_sales"] = payment.get("mobile", 0.0)
             row["other_payment_methods"] = payment.get("other", 0.0)
+            row["total_collected"] = row["cash_sales"] + row["bank_card_sales"] + row["mobile_money_sales"] + row["other_payment_methods"]
             row["payment_method_breakdown"] = payment.get("breakdown", [])
             row["discounts"] = discounts.get(key, 0.0)
             row["waiter_breakdown"] = waiters.get(key, [])
@@ -761,6 +934,243 @@ class PosAnalyticsService(models.AbstractModel):
         for row in rows:
             grouped[(str(row["business_date"]), row["branch_name"], row["session_name"], row["cashier_name"])].append({"waiter_name": row["waiter_name"], "sales": row["sales"]})
         return grouped
+
+    @api.model
+    def get_report_data(self, filters=None):
+        self._check_analytics_access()
+        filters = self._normalize_filters(filters or {})
+        settings = self._get_settings()
+        data = self.get_dashboard_data(dict(filters, include_raw_orders=filters.get("include_raw_orders")))
+        data["sections"] = self._report_sections(filters.get("report_type"))
+        data["grouped_report"] = self.get_grouped_report_data(filters)
+        data["payment_analytics"] = self._get_payment_analytics(filters)
+        data["refund_discount_summary"] = self._get_refund_discount_summary(filters)
+        data["tax_details"] = self._get_tax_details(filters)
+        data["daily_closing_details"] = self._get_daily_closing_details(filters)
+        if not settings["enable_target_cards"]:
+            data["target_summary"] = {}
+        return data
+
+    def _report_sections(self, report_type):
+        report_type = report_type or "management_summary"
+        mapping = {
+            "sales_summary": ["kpis", "grouped", "sales_trend", "branch_comparison", "payment_methods", "refund_discount", "tax_summary"],
+            "daily_closing": ["daily_closing", "daily_closing_payments", "daily_closing_cashiers", "daily_closing_waiters", "daily_closing_orders"],
+            "product_sales": ["grouped", "top_products"],
+            "category_sales": ["grouped", "top_categories"],
+            "waiter_performance": ["grouped", "waiter_performance", "top_products"],
+            "cashier_performance": ["grouped", "cashier_performance", "payment_methods"],
+            "branch_comparison": ["grouped", "branch_comparison", "payment_methods"],
+            "hourly_sales": ["grouped", "peak_hours", "peak_hour_day_heatmap"],
+            "daily_sales": ["grouped", "sales_trend"],
+            "refund_discount": ["refund_discount", "refund_breakdowns", "discount_breakdowns"],
+            "payment_method": ["grouped", "payment_methods", "payment_breakdowns"],
+            "tax": ["tax_summary", "tax_details"],
+            "management_summary": [
+                "kpis", "grouped", "sales_trend", "top_products", "top_categories", "waiter_performance",
+                "cashier_performance", "branch_comparison", "peak_hours", "peak_days", "peak_hour_day_heatmap",
+                "payment_methods", "refund_discount", "tax_summary", "target_summary",
+            ],
+        }
+        return mapping.get(report_type, mapping["management_summary"])
+
+    def get_grouped_report_data(self, filters=None):
+        self._check_analytics_access()
+        filters = self._normalize_filters(filters or {})
+        group_by = filters.get("group_by") or "day"
+        where, params = self._line_where(filters)
+        basis_expr = self._line_basis_expr(filters, "pol")
+        group_defs = self._group_sql_definition(group_by, filters)
+        payment_join = "LEFT JOIN pos_payment ppay ON ppay.pos_order_id = po.id LEFT JOIN pos_payment_method ppm ON ppm.id = ppay.payment_method_id" if group_by == "payment_method" else ""
+        rows = self._fetchall_dict(f"""
+            SELECT {group_defs['select']} AS group_label,
+                   {group_defs.get('extra_select', '')}
+                   COALESCE(SUM(CASE WHEN pol.qty >= 0 THEN {basis_expr} ELSE 0 END), 0) AS total_sales,
+                   COALESCE(SUM(pol.price_subtotal_incl), 0) AS net_sales,
+                   COUNT(DISTINCT po.id) AS order_count,
+                   COALESCE(SUM(pol.qty), 0) AS quantity_sold,
+                   COALESCE(SUM(po.amount_tax) / NULLIF(COUNT(pol.id), 0), 0) AS tax,
+                   COALESCE(SUM(CASE WHEN pol.price_subtotal_incl < 0 THEN ABS(pol.price_subtotal_incl) ELSE 0 END), 0) AS refunds,
+                   COALESCE(SUM(ABS(pol.qty) * pol.price_unit * pol.discount / 100.0), 0) AS discounts
+            FROM pos_order_line pol
+            JOIN pos_order po ON po.id = pol.order_id
+            JOIN product_product pp ON pp.id = pol.product_id
+            JOIN product_template pt ON pt.id = pp.product_tmpl_id
+            LEFT JOIN product_category pc ON pc.id = pt.categ_id
+            LEFT JOIN pos_config pconf ON pconf.id = po.config_id
+            LEFT JOIN pos_session ps ON ps.id = po.session_id
+            LEFT JOIN res_users ru ON ru.id = po.user_id
+            LEFT JOIN res_partner rp ON rp.id = ru.partner_id
+            LEFT JOIN hr_employee he ON he.id = po.employee_id
+            {payment_join}
+            WHERE {where}
+            GROUP BY {group_defs['group_by']}
+            ORDER BY total_sales DESC, group_label
+            LIMIT 500
+        """, group_defs.get("params", []) + params)
+        for row in rows:
+            row["average_order_value"] = row["total_sales"] / row["order_count"] if row["order_count"] else 0.0
+        return rows
+
+    def _group_sql_definition(self, group_by, filters):
+        tz = filters.get("timezone") or DEFAULT_TZ
+        lang = self.env.lang or "en_US"
+        local_dt = f"(po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %s)"
+        defs = {
+            "day": {"select": f"TO_CHAR({local_dt}::date, 'YYYY-MM-DD')", "group_by": "1", "params": [tz]},
+            "week": {"select": f"TO_CHAR(date_trunc('week', {local_dt}), 'IYYY-IW')", "group_by": "1", "params": [tz]},
+            "month": {"select": f"TO_CHAR(date_trunc('month', {local_dt}), 'YYYY-MM')", "group_by": "1", "params": [tz]},
+            "year": {"select": f"TO_CHAR(date_trunc('year', {local_dt}), 'YYYY')", "group_by": "1", "params": [tz]},
+            "product": {"select": "COALESCE(pt.name->>%s, pt.name->>'en_US', pp.default_code, 'Product')", "group_by": "1", "params": [lang], "extra_select": "pol.product_id AS product_id,"},
+            "category": {"select": "COALESCE(pc.complete_name, pc.name, 'No Category')", "group_by": "1", "params": [], "extra_select": "pt.categ_id AS category_id,"},
+            "cashier": {"select": "COALESCE(rp.name, ru.login, 'No Cashier')", "group_by": "1", "params": [], "extra_select": "po.user_id AS cashier_id,"},
+            "waiter": {"select": "COALESCE(he.name, 'No Waiter')", "group_by": "1", "params": [], "extra_select": "po.employee_id AS waiter_id,"},
+            "branch": {"select": "COALESCE(pconf.name, 'No Branch')", "group_by": "1", "params": [], "extra_select": "po.config_id AS branch_id,"},
+            "payment_method": {"select": "COALESCE(ppm.name, 'No Payment Method')", "group_by": "1", "params": [], "extra_select": "ppm.id AS payment_method_id,"},
+            "hour": {"select": f"TO_CHAR({local_dt}, 'HH24:00')", "group_by": "1", "params": [tz]},
+            "weekday": {"select": f"TO_CHAR({local_dt}, 'Day')", "group_by": "1, EXTRACT(ISODOW FROM " + local_dt + ")", "params": [tz, tz]},
+            "session": {"select": "COALESCE(ps.name, 'No Session')", "group_by": "1", "params": [], "extra_select": "po.session_id AS session_id,"},
+        }
+        res = defs.get(group_by, defs["day"])
+        res.setdefault("extra_select", "")
+        return res
+
+    def _get_peak_hour_day_heatmap(self, filters):
+        where, params = self._order_where(filters, alias="po")
+        rows = self._fetchall_dict(f"""
+            SELECT EXTRACT(ISODOW FROM (po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %s))::int AS day_number,
+                   EXTRACT(HOUR FROM (po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %s))::int AS hour,
+                   COUNT(po.id) AS order_count,
+                   COALESCE(SUM(po.amount_total), 0) AS sales_amount
+            FROM pos_order po
+            WHERE {where}
+            GROUP BY 1, 2
+            ORDER BY 1, 2
+        """, [filters["timezone"], filters["timezone"]] + params)
+        for row in rows:
+            row["day_label"] = calendar.day_abbr[row["day_number"] - 1]
+            row["label"] = "%s %02d:00" % (row["day_label"], row["hour"])
+        return rows
+
+    def _get_payment_analytics(self, filters):
+        rows = self._payment_group_rows(filters)
+        total = sum(row.get("amount", 0.0) for row in rows) or 0.0
+        for row in rows:
+            row["percentage"] = row.get("amount", 0.0) / total * 100.0 if total else 0.0
+        return {
+            "summary": rows,
+            "branch_breakdown": self._payment_breakdown(filters, "branch"),
+            "cashier_breakdown": self._payment_breakdown(filters, "cashier"),
+            "date_breakdown": self._payment_breakdown(filters, "date"),
+        }
+
+    def _payment_breakdown(self, filters, group):
+        where, params = self._order_where(filters, alias="po")
+        if group == "branch":
+            select = "COALESCE(pc.name, 'No Branch') AS group_label"
+            joins = "LEFT JOIN pos_config pc ON pc.id = po.config_id"
+            groupby = "group_label"
+            extra_params = []
+        elif group == "cashier":
+            select = "COALESCE(rp.name, ru.login, 'No Cashier') AS group_label"
+            joins = "LEFT JOIN res_users ru ON ru.id = po.user_id LEFT JOIN res_partner rp ON rp.id = ru.partner_id"
+            groupby = "group_label"
+            extra_params = []
+        else:
+            select = "TO_CHAR((po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %s)::date, 'YYYY-MM-DD') AS group_label"
+            joins = ""
+            groupby = "group_label"
+            extra_params = [filters["timezone"]]
+        rows = self._fetchall_dict(f"""
+            SELECT {select}, ppm.name AS payment_method_name, COALESCE(SUM(pp.amount), 0) AS amount, COUNT(DISTINCT po.id) AS order_count
+            FROM pos_payment pp
+            JOIN pos_order po ON po.id = pp.pos_order_id
+            JOIN pos_payment_method ppm ON ppm.id = pp.payment_method_id
+            {joins}
+            WHERE {where}
+            GROUP BY {groupby}, ppm.name
+            ORDER BY group_label, amount DESC
+        """, extra_params + params)
+        return rows
+
+    def _get_tax_details(self, filters):
+        return {
+            "by_date": self._tax_breakdown(filters, "date"),
+            "by_branch": self._tax_breakdown(filters, "branch"),
+            "by_category": self._tax_breakdown(filters, "category"),
+            "by_session": self._tax_breakdown(filters, "session"),
+        }
+
+    def _tax_breakdown(self, filters, group):
+        if group in ("category",):
+            where, params = self._line_where(filters)
+            return self._fetchall_dict(f"""
+                SELECT COALESCE(pc.complete_name, pc.name, 'No Category') AS group_label,
+                       COALESCE(SUM(po.amount_tax) / NULLIF(COUNT(pol.id), 0), 0) AS tax_amount,
+                       COUNT(DISTINCT po.id) AS order_count
+                FROM pos_order_line pol
+                JOIN pos_order po ON po.id = pol.order_id
+                JOIN product_product pp ON pp.id = pol.product_id
+                JOIN product_template pt ON pt.id = pp.product_tmpl_id
+                LEFT JOIN product_category pc ON pc.id = pt.categ_id
+                WHERE {where}
+                GROUP BY group_label
+                ORDER BY tax_amount DESC
+            """, params)
+        where, params = self._order_where(filters, alias="po")
+        if group == "branch":
+            select, joins, extra = "COALESCE(pc.name, 'No Branch')", "LEFT JOIN pos_config pc ON pc.id = po.config_id", []
+        elif group == "session":
+            select, joins, extra = "COALESCE(ps.name, 'No Session')", "LEFT JOIN pos_session ps ON ps.id = po.session_id", []
+        else:
+            select, joins, extra = "TO_CHAR((po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %s)::date, 'YYYY-MM-DD')", "", [filters["timezone"]]
+        return self._fetchall_dict(f"""
+            SELECT {select} AS group_label, COALESCE(SUM(po.amount_tax), 0) AS tax_amount, COUNT(po.id) AS order_count
+            FROM pos_order po
+            {joins}
+            WHERE {where}
+            GROUP BY group_label
+            ORDER BY group_label
+        """, extra + params)
+
+    def _get_daily_closing_details(self, filters):
+        return {
+            "summary": self._get_daily_closing(filters),
+            "payments": self._daily_closing_payment_rows(filters),
+            "cashiers": self._daily_closing_cashier_rows(filters),
+            "waiters": self._daily_closing_waiter_rows(filters),
+            "orders": self._get_raw_orders(dict(filters, include_raw_orders=True)),
+        }
+
+    def _daily_closing_payment_rows(self, filters):
+        where, params = self._order_where(filters, alias="po")
+        rows = self._fetchall_dict(f"""
+            SELECT COALESCE(pc.name, 'No Branch') AS branch_name, COALESCE(ps.name, 'No Session') AS session_name,
+                   ppm.name AS payment_method_name, COALESCE(SUM(pp.amount), 0) AS amount, COUNT(DISTINCT po.id) AS order_count
+            FROM pos_payment pp
+            JOIN pos_order po ON po.id = pp.pos_order_id
+            JOIN pos_payment_method ppm ON ppm.id = pp.payment_method_id
+            LEFT JOIN pos_config pc ON pc.id = po.config_id
+            LEFT JOIN pos_session ps ON ps.id = po.session_id
+            WHERE {where}
+            GROUP BY pc.name, ps.name, ppm.name
+            ORDER BY branch_name, session_name, amount DESC
+        """, params)
+        return rows
+
+    def _daily_closing_cashier_rows(self, filters):
+        rows = self._get_cashier_performance(filters, limit=500)
+        for row in rows:
+            row["orders"] = row.get("number_of_orders", 0)
+            row["total_sales"] = row.get("total_collected", 0.0)
+            row["collected_amount"] = row.get("total_collected", 0.0)
+        return rows
+
+    def _daily_closing_waiter_rows(self, filters):
+        rows = self._get_waiter_performance(filters, limit=500)
+        for row in rows:
+            row["orders"] = row.get("total_orders", 0)
+        return rows
 
     def _get_raw_orders(self, filters):
         where, params = self._order_where(filters, alias="po")

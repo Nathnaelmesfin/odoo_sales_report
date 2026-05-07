@@ -12,7 +12,7 @@ class PosAnalyticsController(http.Controller):
 
     @http.route("/pos_advanced_analytics/report/xlsx/<int:wizard_id>", type="http", auth="user")
     def download_xlsx(self, wizard_id, filters=None, **kwargs):
-        if not request.env.user.has_group("pos_advanced_analytics.group_pos_analytics_manager"):
+        if not request.env.user.has_group("pos_advanced_analytics.group_pos_analytics_user"):
             raise Forbidden()
         wizard = request.env["pos.analytics.report.wizard"].browse(wizard_id).exists()
         if not wizard:

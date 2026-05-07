@@ -4,7 +4,7 @@ import json
 from urllib.parse import quote
 
 from odoo import api, fields, models, _
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
 
 
 class PosAnalyticsReportWizard(models.TransientModel):
@@ -60,7 +60,12 @@ class PosAnalyticsReportWizard(models.TransientModel):
             if wizard.date_start and wizard.date_end and wizard.date_end < wizard.date_start:
                 raise ValidationError(_("End date must be on or after start date."))
 
+    def _check_analytics_access(self):
+        if not self.env.user.has_group("pos_advanced_analytics.group_pos_analytics_user"):
+            raise AccessError(_("You do not have access to POS analytics reports."))
+
     def _filters(self):
+        self._check_analytics_access()
         self.ensure_one()
         states = ["paid", "done", "invoiced"] if self.order_state == "all" else [self.order_state]
         return {
@@ -85,7 +90,7 @@ class PosAnalyticsReportWizard(models.TransientModel):
     def _report_payload(self):
         self.ensure_one()
         filters = self._filters()
-        data = self.env["pos.analytics.service"].get_dashboard_data(filters)
+        data = self.env["pos.analytics.service"].get_report_data(filters)
         data.update({
             "wizard_id": self.id,
             "report_title": dict(self._fields["report_type"].selection).get(self.report_type),
@@ -93,16 +98,29 @@ class PosAnalyticsReportWizard(models.TransientModel):
             "generated_at": fields.Datetime.context_timestamp(self, fields.Datetime.now()).strftime("%Y-%m-%d %H:%M:%S"),
             "company": self.company_id,
             "branch_filter": ", ".join(self.pos_config_ids.mapped("name")) or _("All POS Branches"),
+            "group_by_label": dict(self._fields["group_by"].selection).get(self.group_by, self.group_by),
         })
         return data
 
+
+    def _format_report_value(self, value):
+        if isinstance(value, float):
+            return "{:,.2f}".format(value)
+        if isinstance(value, int):
+            return "{:,}".format(value)
+        if isinstance(value, list):
+            return "; ".join(str(item) for item in value)
+        return value or ""
+
     def action_generate_pdf(self):
         self.ensure_one()
+        self._check_analytics_access()
         self.export_format = "pdf"
         return self.env.ref("pos_advanced_analytics.action_report_pos_analytics_pdf").report_action(self, data={"filters": self._filters()})
 
     def action_generate_excel(self):
         self.ensure_one()
+        self._check_analytics_access()
         self.export_format = "xlsx"
         payload = quote(json.dumps(self._filters()), safe="")
         return {

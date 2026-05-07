@@ -11,8 +11,7 @@ Adds a branch-ready Point of Sale analytics dashboard and reporting suite focuse
 sales, orders, products, categories, waiters, cashiers, branches, payments, refunds,
 discounts, taxes, peak hours, and management summaries.
 
-This module intentionally excludes cost, COGS, margin, profit, manufacturing, stock
-valuation, and inventory valuation analytics.
+This module intentionally focuses only on POS sales and operational analytics.
     """,
     "author": "Codex",
     "website": "https://www.odoo.com",
